@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+local-demo/sample-data/
+local-demo/output/
+.azure-outputs.json
+.fabric-outputs.json
+.env

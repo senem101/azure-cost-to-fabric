@@ -1,0 +1,598 @@
+{
+  "compatibilityLevel": 1604,
+  "model": {
+    "culture": "en-US",
+    "defaultPowerBIDataSourceVersion": "powerBI_V3",
+    "discourageImplicitMeasures": true,
+    "sourceQueryCulture": "en-US",
+    "tables": [
+      {
+        "name": "Cost",
+        "lineageTag": "ff59c764-8b68-5192-9c6a-3cce45200f80",
+        "columns": [
+          {
+            "name": "charge_date",
+            "dataType": "dateTime",
+            "sourceColumn": "charge_date",
+            "lineageTag": "cbe66f26-d8ef-55fe-80de-791bfc93ba94",
+            "summarizeBy": "none",
+            "isHidden": true,
+            "formatString": "yyyy-mm-dd"
+          },
+          {
+            "name": "resource_key",
+            "dataType": "string",
+            "sourceColumn": "resource_key",
+            "lineageTag": "08a2d898-e147-5a73-a72f-0e548b541556",
+            "summarizeBy": "none",
+            "isHidden": true
+          },
+          {
+            "name": "service_name",
+            "dataType": "string",
+            "sourceColumn": "service_name",
+            "lineageTag": "2c856e39-8b5e-55a9-b2d4-b43db10691a8",
+            "summarizeBy": "none",
+            "isHidden": true
+          },
+          {
+            "name": "Meter Category",
+            "dataType": "string",
+            "sourceColumn": "meter_category",
+            "lineageTag": "0df49384-58e4-5b64-b2c2-ff7a50d9b0a6",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Charge Category",
+            "dataType": "string",
+            "sourceColumn": "charge_category",
+            "lineageTag": "5ea3c957-2b98-5f93-a2b8-ccf4f05201c4",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Pricing Category",
+            "dataType": "string",
+            "sourceColumn": "pricing_category",
+            "lineageTag": "40dbd5c0-0ce8-5778-8aa9-2abd9eaf71af",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Currency",
+            "dataType": "string",
+            "sourceColumn": "billing_currency",
+            "lineageTag": "0f00d3b2-52b3-5635-8ffe-8ab0b0548545",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "billed_cost",
+            "dataType": "decimal",
+            "sourceColumn": "billed_cost",
+            "lineageTag": "ebbad84d-3594-5da3-b58a-7e8eba08d9f9",
+            "summarizeBy": "sum",
+            "isHidden": true,
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "effective_cost",
+            "dataType": "decimal",
+            "sourceColumn": "effective_cost",
+            "lineageTag": "55bd404a-5d7c-5617-a6be-87b5ad10923e",
+            "summarizeBy": "sum",
+            "isHidden": true,
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "list_cost",
+            "dataType": "decimal",
+            "sourceColumn": "list_cost",
+            "lineageTag": "beb9af27-6965-54a9-a9da-ce4ffb9f444e",
+            "summarizeBy": "sum",
+            "isHidden": true,
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "savings",
+            "dataType": "decimal",
+            "sourceColumn": "savings",
+            "lineageTag": "27f697f3-9c6b-51dc-bf5a-de6a28d9cd96",
+            "summarizeBy": "sum",
+            "isHidden": true,
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "consumed_quantity",
+            "dataType": "double",
+            "sourceColumn": "consumed_quantity",
+            "lineageTag": "849d4580-e531-516e-af1a-fd0b44d269c8",
+            "summarizeBy": "sum",
+            "isHidden": true
+          },
+          {
+            "name": "line_items",
+            "dataType": "int64",
+            "sourceColumn": "line_items",
+            "lineageTag": "9ecdaa7e-1455-50a5-aadf-dad2aacca666",
+            "summarizeBy": "sum",
+            "isHidden": true,
+            "formatString": "#,0"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Cost-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_fact_cost_daily",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ],
+        "measures": [
+          {
+            "name": "Effective Cost",
+            "expression": "SUM ( 'Cost'[effective_cost] )",
+            "formatString": "#,0.00",
+            "lineageTag": "723dea8d-4a8a-5cdf-a927-625ca0eaba70",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "Billed Cost",
+            "expression": "SUM ( 'Cost'[billed_cost] )",
+            "formatString": "#,0.00",
+            "lineageTag": "8f681728-64db-555f-9b4b-db666a6ef544",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "List Cost",
+            "expression": "SUM ( 'Cost'[list_cost] )",
+            "formatString": "#,0.00",
+            "lineageTag": "f7b3b665-d334-541f-a027-a959ac1f696e",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "Savings",
+            "expression": "[List Cost] - [Effective Cost]",
+            "formatString": "#,0.00",
+            "lineageTag": "bc56f44d-6440-54a9-b999-1f59ef56e686",
+            "displayFolder": "Savings"
+          },
+          {
+            "name": "Savings %",
+            "expression": "DIVIDE ( [Savings], [List Cost] )",
+            "formatString": "0.0%",
+            "lineageTag": "b65bf00b-2f37-504d-b6c2-79c754a10a80",
+            "displayFolder": "Savings"
+          },
+          {
+            "name": "Effective Cost MTD",
+            "expression": "TOTALMTD ( [Effective Cost], 'Date'[Date] )",
+            "formatString": "#,0.00",
+            "lineageTag": "d6dcc182-5a1d-5a57-a72d-41e19663f7f7",
+            "displayFolder": "Time intelligence"
+          },
+          {
+            "name": "Effective Cost YTD",
+            "expression": "TOTALYTD ( [Effective Cost], 'Date'[Date] )",
+            "formatString": "#,0.00",
+            "lineageTag": "be657dbb-57ad-52b8-94ca-c6b76c1365d4",
+            "displayFolder": "Time intelligence"
+          },
+          {
+            "name": "Effective Cost PM",
+            "expression": "CALCULATE ( [Effective Cost], DATEADD ( 'Date'[Date], -1, MONTH ) )",
+            "formatString": "#,0.00",
+            "lineageTag": "4dd2bf67-f872-5126-8d59-941f69ac33b1",
+            "displayFolder": "Time intelligence"
+          },
+          {
+            "name": "MoM Change",
+            "expression": "IF ( NOT ISBLANK ( [Effective Cost PM] ), [Effective Cost] - [Effective Cost PM] )",
+            "formatString": "#,0.00",
+            "lineageTag": "cc1467b3-0b61-5941-8ac9-4e22185d459f",
+            "displayFolder": "Time intelligence"
+          },
+          {
+            "name": "MoM Change %",
+            "expression": "DIVIDE ( [MoM Change], [Effective Cost PM] )",
+            "formatString": "+0.0%;-0.0%;0.0%",
+            "lineageTag": "382c595b-7dbe-5c92-a6b4-0d243fcfdbcf",
+            "displayFolder": "Time intelligence"
+          },
+          {
+            "name": "Avg Daily Cost",
+            "expression": "AVERAGEX ( VALUES ( 'Date'[Date] ), [Effective Cost] )",
+            "formatString": "#,0.00",
+            "lineageTag": "fbe3ffe9-5f57-5f70-bab8-7f85bf89cd24",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "Resource Count",
+            "expression": "CALCULATE ( DISTINCTCOUNT ( 'Cost'[resource_key] ), 'Cost'[resource_key] <> \"unassigned\" )",
+            "formatString": "#,0",
+            "lineageTag": "199dbab9-1e63-56e4-9b0a-002609a20fa7",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "Line Items",
+            "expression": "SUM ( 'Cost'[line_items] )",
+            "formatString": "#,0",
+            "lineageTag": "8c31bdd1-c7b7-5382-bd39-003959cacc97",
+            "displayFolder": "Cost"
+          }
+        ]
+      },
+      {
+        "name": "Date",
+        "lineageTag": "9c20b355-18a1-51f6-97c7-996742b81a2a",
+        "columns": [
+          {
+            "name": "Date",
+            "dataType": "dateTime",
+            "sourceColumn": "date",
+            "lineageTag": "39a969a2-f2be-5985-8feb-35cd2480c40f",
+            "summarizeBy": "none",
+            "isKey": true,
+            "formatString": "yyyy-mm-dd"
+          },
+          {
+            "name": "Year",
+            "dataType": "int64",
+            "sourceColumn": "year",
+            "lineageTag": "10ed720c-ae3b-5b9a-8151-68ad49d5e6f3",
+            "summarizeBy": "none",
+            "formatString": "0"
+          },
+          {
+            "name": "Quarter",
+            "dataType": "string",
+            "sourceColumn": "quarter",
+            "lineageTag": "77ddab88-da27-57b6-a15f-61a376241ffe",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Month Number",
+            "dataType": "int64",
+            "sourceColumn": "month",
+            "lineageTag": "dd6f7a72-a5b5-5145-8b3d-a6578324bf91",
+            "summarizeBy": "none",
+            "isHidden": true,
+            "formatString": "0"
+          },
+          {
+            "name": "Month",
+            "dataType": "string",
+            "sourceColumn": "month_name",
+            "lineageTag": "1a281e78-2639-5eaf-a269-d34eef52aeaf",
+            "summarizeBy": "none",
+            "sortByColumn": "Month Number"
+          },
+          {
+            "name": "Year Month Sort",
+            "dataType": "int64",
+            "sourceColumn": "year_month_sort",
+            "lineageTag": "5d15266a-4158-5364-a547-5cd4d532fda1",
+            "summarizeBy": "none",
+            "isHidden": true,
+            "formatString": "0"
+          },
+          {
+            "name": "Year Month",
+            "dataType": "string",
+            "sourceColumn": "year_month",
+            "lineageTag": "f4155971-d6c0-5bc9-b8c3-9a393afb9755",
+            "summarizeBy": "none",
+            "sortByColumn": "Year Month Sort"
+          },
+          {
+            "name": "Day",
+            "dataType": "int64",
+            "sourceColumn": "day",
+            "lineageTag": "3b87e47f-816c-59d7-8d56-f84ff6ea9f01",
+            "summarizeBy": "none",
+            "formatString": "0"
+          },
+          {
+            "name": "Day Of Week",
+            "dataType": "int64",
+            "sourceColumn": "day_of_week",
+            "lineageTag": "34dd08c1-ded8-5959-9211-63e92969b35d",
+            "summarizeBy": "none",
+            "isHidden": true,
+            "formatString": "0"
+          },
+          {
+            "name": "Weekday",
+            "dataType": "string",
+            "sourceColumn": "day_name",
+            "lineageTag": "e47ed4c7-f4a7-509f-bbe3-a716d5c2307a",
+            "summarizeBy": "none",
+            "sortByColumn": "Day Of Week"
+          },
+          {
+            "name": "Is Weekend",
+            "dataType": "boolean",
+            "sourceColumn": "is_weekend",
+            "lineageTag": "58b1f19b-c7da-5e18-836b-d14b84b9aa56",
+            "summarizeBy": "none"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Date-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_dim_date",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ],
+        "dataCategory": "Time"
+      },
+      {
+        "name": "Resource",
+        "lineageTag": "8d8fc509-ea02-59c4-828b-1d7993560f00",
+        "columns": [
+          {
+            "name": "resource_key",
+            "dataType": "string",
+            "sourceColumn": "resource_key",
+            "lineageTag": "03a7b16c-ef00-5608-b2cb-97cc18af3a9d",
+            "summarizeBy": "none",
+            "isHidden": true,
+            "isKey": true
+          },
+          {
+            "name": "Resource Id",
+            "dataType": "string",
+            "sourceColumn": "resource_id",
+            "lineageTag": "af344e18-e667-598d-b9c5-72d309e1579c",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Resource",
+            "dataType": "string",
+            "sourceColumn": "resource_name",
+            "lineageTag": "2399b370-aa89-5c9f-81ac-e7e9e4fa0149",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Resource Type",
+            "dataType": "string",
+            "sourceColumn": "resource_type",
+            "lineageTag": "dd09621d-8f85-53d6-8653-fb28e2c8d8ba",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Resource Group",
+            "dataType": "string",
+            "sourceColumn": "resource_group",
+            "lineageTag": "c834109e-b8ca-5671-abe6-4d9794378ac2",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Subscription Id",
+            "dataType": "string",
+            "sourceColumn": "subscription_id",
+            "lineageTag": "cc37e776-2a04-5df3-925d-aa1651986da0",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Subscription",
+            "dataType": "string",
+            "sourceColumn": "subscription_name",
+            "lineageTag": "74da76fe-5ac1-5f40-904e-01707632c8c7",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Region",
+            "dataType": "string",
+            "sourceColumn": "region",
+            "lineageTag": "6707e8a4-0217-5618-a0cd-e6b60249a7a3",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Environment (tag)",
+            "dataType": "string",
+            "sourceColumn": "tag_environment",
+            "lineageTag": "36966be3-5cdf-51c8-b450-e9c437e53881",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Cost Center (tag)",
+            "dataType": "string",
+            "sourceColumn": "tag_cost_center",
+            "lineageTag": "64554b13-be56-5143-803d-e3be5391d61b",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Project (tag)",
+            "dataType": "string",
+            "sourceColumn": "tag_project",
+            "lineageTag": "52487f3a-8e2b-5493-9906-d51c1360eb3d",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Tags (JSON)",
+            "dataType": "string",
+            "sourceColumn": "tags",
+            "lineageTag": "817c664c-6446-5a05-abb0-8d4d0408bb4d",
+            "summarizeBy": "none"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Resource-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_dim_resource",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Service",
+        "lineageTag": "40ad355f-7836-5976-afdd-f84be71c4559",
+        "columns": [
+          {
+            "name": "Service",
+            "dataType": "string",
+            "sourceColumn": "service_name",
+            "lineageTag": "90608434-f781-51a5-a0b8-e5b07f0bd5ff",
+            "summarizeBy": "none",
+            "isKey": true
+          },
+          {
+            "name": "Service Category",
+            "dataType": "string",
+            "sourceColumn": "service_category",
+            "lineageTag": "c8eb486a-368a-5191-a36a-8e576714909a",
+            "summarizeBy": "none"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Service-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_dim_service",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ]
+      },
+      {
+        "name": "Monthly Summary",
+        "lineageTag": "fdaa837c-98cc-57ec-bad8-730640785afb",
+        "columns": [
+          {
+            "name": "Year Month",
+            "dataType": "string",
+            "sourceColumn": "year_month",
+            "lineageTag": "fcbfd342-54dc-5922-9149-6765232023fe",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "service_name",
+            "dataType": "string",
+            "sourceColumn": "service_name",
+            "lineageTag": "33189884-ccac-5534-9ddb-310a0473dd9e",
+            "summarizeBy": "none",
+            "isHidden": true
+          },
+          {
+            "name": "Monthly Cost",
+            "dataType": "decimal",
+            "sourceColumn": "effective_cost",
+            "lineageTag": "f3f269c6-7f2f-53a2-95e4-af4637f11ba9",
+            "summarizeBy": "sum",
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "Monthly List Cost",
+            "dataType": "decimal",
+            "sourceColumn": "list_cost",
+            "lineageTag": "d34c27d9-255d-5af7-bc68-bbf1e5772d5b",
+            "summarizeBy": "sum",
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "Previous Month Cost",
+            "dataType": "decimal",
+            "sourceColumn": "previous_month_cost",
+            "lineageTag": "14ef2f42-8f3b-5905-b55c-ee7c400139b6",
+            "summarizeBy": "sum",
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "MoM Change (monthly)",
+            "dataType": "decimal",
+            "sourceColumn": "mom_change",
+            "lineageTag": "d335c87b-412d-5d4d-872b-7cb2569b9bca",
+            "summarizeBy": "sum",
+            "formatString": "#,0.00"
+          },
+          {
+            "name": "MoM Change % (monthly)",
+            "dataType": "double",
+            "sourceColumn": "mom_change_pct",
+            "lineageTag": "d4102eb7-1de9-5cc5-8ac4-c09df90ef0d9",
+            "summarizeBy": "none",
+            "formatString": "+0.0%;-0.0%;0.0%"
+          },
+          {
+            "name": "YTD Cost",
+            "dataType": "decimal",
+            "sourceColumn": "ytd_cost",
+            "lineageTag": "878cec7f-e6ce-5bb1-a09e-6795acf614bd",
+            "summarizeBy": "sum",
+            "formatString": "#,0.00"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Monthly Summary-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_cost_monthly",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "name": "0fd41e43-f267-5d92-9fab-a1fe54429431",
+        "fromTable": "Cost",
+        "fromColumn": "charge_date",
+        "toTable": "Date",
+        "toColumn": "Date"
+      },
+      {
+        "name": "7242497b-6731-52c9-9142-9d75f58b70a8",
+        "fromTable": "Cost",
+        "fromColumn": "resource_key",
+        "toTable": "Resource",
+        "toColumn": "resource_key"
+      },
+      {
+        "name": "c031ed8e-1d0a-5d11-9e14-aa13e82fde93",
+        "fromTable": "Cost",
+        "fromColumn": "service_name",
+        "toTable": "Service",
+        "toColumn": "Service"
+      },
+      {
+        "name": "73898572-35ac-589d-9beb-4dc5948ff98c",
+        "fromTable": "Monthly Summary",
+        "fromColumn": "service_name",
+        "toTable": "Service",
+        "toColumn": "Service"
+      }
+    ],
+    "expressions": [
+      {
+        "name": "DatabaseQuery",
+        "kind": "m",
+        "expression": [
+          "let",
+          "    database = Sql.Database(\"{{SQL_ENDPOINT}}\", \"{{SQL_ENDPOINT_ID}}\")",
+          "in",
+          "    database"
+        ],
+        "lineageTag": "422fde2d-01f9-51e3-883e-94b84a068922"
+      }
+    ]
+  }
+}

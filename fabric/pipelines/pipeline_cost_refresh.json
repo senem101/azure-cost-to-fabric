@@ -1,0 +1,29 @@
+{
+  "name": "Cost Refresh Pipeline",
+  "properties": {
+    "description": "Daily Azure cost refresh: Bronze (raw FOCUS export) -> Silver (latest run, conformed) -> Gold (star schema for Direct Lake).",
+    "activities": [
+      {
+        "name": "01 Bronze",
+        "type": "TridentNotebook",
+        "dependsOn": [],
+        "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+        "typeProperties": { "notebookId": "01_bronze_costs" }
+      },
+      {
+        "name": "02 Silver",
+        "type": "TridentNotebook",
+        "dependsOn": [ { "activity": "01 Bronze", "dependencyConditions": [ "Succeeded" ] } ],
+        "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+        "typeProperties": { "notebookId": "02_silver_costs" }
+      },
+      {
+        "name": "03 Gold",
+        "type": "TridentNotebook",
+        "dependsOn": [ { "activity": "02 Silver", "dependencyConditions": [ "Succeeded" ] } ],
+        "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+        "typeProperties": { "notebookId": "03_gold_costs" }
+      }
+    ]
+  }
+}

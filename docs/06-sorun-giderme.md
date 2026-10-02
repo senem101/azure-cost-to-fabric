@@ -1,0 +1,70 @@
+# 6. Sorun giderme
+
+## Azure tarafı
+
+### `The subscription is not registered to use namespace 'Microsoft.CostManagementExports'`
+`01-deploy-azure.ps1` provider'ı kaydeder; kayıt birkaç dakika sürebilir. Manuel: `az provider register -n Microsoft.CostManagementExports --wait`.
+
+### Export oluşturulamıyor: `FocusCost is not supported for this scope / offer`
+FOCUS export'u EA, MCA ve Pay-as-you-go abonelikleri destekler. Bazı **Sponsorship, MSDN, Visual Studio, CSP (eski)** abonelikleri desteklemeyebilir. Çözüm: export'u fatura hesabı (billing account) kapsamında oluşturun veya `definition.type` değerini `AmortizedCost` yapın. Silver'daki `pick()` fonksiyonu `CostInBillingCurrency` gibi alternatif kolon adlarını eklemenizi kolaylaştırır.
+
+### `scheduleStart must be in the future`
+`exportStartDate` parametresi geçmiş bir tarihe ayarlanmış. Parametreyi boş bırakın (varsayılan: bugün → ilk çalışma yarın).
+
+### Export çalıştı ama dosya yok
+- `runHistory` içinde `status` alanına bakın: `az rest --method get --url "<COST_EXPORT_ID>?api-version=2025-03-01&$expand=runHistory"`.
+- **Yeni abonelik:** Maliyet verisi ilk 24–48 saat oluşmayabilir; boş ay için dosya yazılmaz.
+- Storage'da `allowSharedKeyAccess: false` yapılmışsa export yazamaz (bkz. [Mimari → Güvenlik](01-mimari.md#güvenlik-modeli)).
+- Storage firewall'u "Selected networks" ise *Allow trusted Microsoft services* işaretli olmalı.
+
+### `az storage fs file list` → `AuthorizationPermissionMismatch`
+Rol ataması yayılıyor (~5 dk). Bekleyip tekrar deneyin.
+
+## Fabric tarafı
+
+### `Capacity ... is not Active (state: Inactive)`
+Kapasite duraklatılmış. Azure portal → *Microsoft Fabric capacity* → **Resume**, ya da:
+```powershell
+az resource invoke-action --action resume --ids <capacity-resource-id>
+```
+Demo sonrası **Suspend** etmeyi unutmayın (çalıştığı her saat ücretlendirilir).
+
+### Bağlantı oluşturma `Credentials provided are invalid` / `Forbidden` ile başarısız
+Workspace identity'nin rolü henüz yayılmadı. Script 15 kez × 30 sn tekrar dener. Yine olmuyorsa:
+- Storage → **Access control (IAM)** → *Role assignments* → workspace adıyla aynı isimdeki servis sorumlusunun **Storage Blob Data Reader** olduğunu doğrulayın.
+- Tenant'ta workspace identity kullanımı kısıtlıysa [manuel bağlantı](03-fabric-kurulum.md#34-manuel-alternatif-bağlantıyı-portaldan-oluşturma) oluşturup `--connection-id` ile verin.
+
+### Shortcut oluştu ama `Files/costs` boş görünüyor
+- Export henüz dosya yazmamış olabilir (yukarıya bakın).
+- Bağlantının `path` değeri container'ı (`costs`) göstermeli; shortcut `subpath` = `/costs`.
+
+### Bronze: `Path does not exist: Files/costs`
+Notebook'un **varsayılan lakehouse**'u bağlı değil. Notebook → sol panel → *Lakehouses* → `CostLakehouse` → **Set as default**. (Script bunu otomatik yapar; elle import edilen notebook'larda gerekir.)
+
+### Silver: toplam maliyet portaldakinin 2–3 katı
+Eski run'lar elenmiyor demektir. `_source_file` yolunun `/<yyyyMMdd-yyyyMMdd>/<runId>/` desenine uyduğunu kontrol edin:
+```python
+spark.read.table("bronze_costs").select("_source_file").distinct().show(truncate=False)
+```
+Desen tutmazsa `_billing_period` boş döner ve tüm satırlar tutulur. Regex'i kendi klasör yapınıza göre güncelleyin.
+
+### Gold: `AssertionError: Gold ve Silver toplamları uyuşmuyor!`
+Silver ile Gold toplamı farklı. Genellikle Silver'da `charge_date` veya `effective_cost` NULL olan satırlar ya da para birimi karışımı nedeniyle olur. `silver_costs`'ta `billing_currency` dağılımını kontrol edin.
+
+### Semantic model: `Direct Lake: table not found`
+Model, Gold tabloları oluşmadan yaratılmış. Pipeline'ı çalıştırın, ardından:
+```powershell
+python scripts/setup_fabric.py --capacity-name <kapasite> --skip-run
+```
+(script modeli günceller ve refresh eder) veya model → **Refresh**.
+
+### Rapor eski veriyi gösteriyor
+Direct Lake model, Delta tablosu değişince otomatik yenilenir (*Keep your Direct Lake data up to date* ayarı açıksa). Kapalıysa pipeline'ın sonuna bir **Semantic model refresh** aktivitesi ekleyin.
+
+## Genel
+
+| Belirti | Kontrol |
+|---|---|
+| `az` komutları `AADSTS...` hatası veriyor | `az login --tenant <tenant-id>` |
+| `setup_fabric.py` → 401 | Fabric API token'ı alınamadı: `az account get-access-token --resource https://api.fabric.microsoft.com` |
+| 429 Too Many Requests | Script `Retry-After` süresine uyar; çok sık tekrar çalıştırmayın |

@@ -1,0 +1,49 @@
+// Daily FOCUS 1.0 cost export (month-to-date) at subscription scope.
+targetScope = 'subscription'
+
+param exportName string
+param storageAccountId string
+
+@description('First scheduled run (ISO 8601). Must be in the future.')
+param scheduleStart string
+
+resource costExport 'Microsoft.CostManagement/exports@2025-03-01' = {
+  name: exportName
+  properties: {
+    exportDescription: 'Daily FOCUS cost export consumed by Microsoft Fabric'
+    definition: {
+      type: 'FocusCost'
+      timeframe: 'MonthToDate'
+      dataSet: {
+        granularity: 'Daily'
+        configuration: {
+          dataVersion: '1.0'
+        }
+      }
+    }
+    deliveryInfo: {
+      destination: {
+        type: 'AzureBlob'
+        resourceId: storageAccountId
+        container: 'costs'
+        rootFolderPath: 'focus'
+      }
+    }
+    format: 'Parquet'
+    compressionMode: 'snappy'
+    partitionData: true
+    // Each daily run replaces the month's files; Silver still keeps only the latest run as a safeguard.
+    dataOverwriteBehavior: 'OverwritePreviousReport'
+    schedule: {
+      status: 'Active'
+      recurrence: 'Daily'
+      recurrencePeriod: {
+        from: scheduleStart
+        to: dateTimeAdd(scheduleStart, 'P5Y')
+      }
+    }
+  }
+}
+
+output exportName string = costExport.name
+output exportId string = costExport.id

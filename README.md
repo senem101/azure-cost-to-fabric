@@ -84,7 +84,7 @@ Fabric tarafında değişiklik gerekmez: Bronze tüm klasörleri okur, Silver he
 | 2 | [Azure Cost Export](docs/02-azure-cost-export.md) | Bicep, export ayarları, klasör yapısı, backfill |
 | 3 | [Fabric kurulumu](docs/03-fabric-kurulum.md) | `setup_fabric.py` adımları, manuel alternatifler, yetkiler |
 | 4 | [Medallion notebook'lar](docs/04-medallion-notebooklar.md) | Bronze/Silver/Gold mantığı, çift sayım problemi |
-| 5 | [Power BI rapor](docs/05-power-bi-rapor.md) | Semantic model, DAX ölçüleri, rapor sayfalarını oluşturma |
+| 5 | [Power BI rapor](docs/05-power-bi-rapor.md) | Semantic model, DAX ölçüleri, hazır filtreli rapor sayfası, ek sayfalar |
 | 6 | [Demo adım adım](docs/demo-adim-adim.md) | Yerel ve canlı demo senaryosu |
 | 7 | [Sorun giderme](docs/06-sorun-giderme.md) | Sık karşılaşılan hatalar ve çözümleri |
 
@@ -104,7 +104,8 @@ azure-cost-to-fabric/
 ├── fabric/
 │   ├── notebooks/                 # 01_bronze, 02_silver, 03_gold (PySpark)
 │   ├── pipelines/                 # Bronze → Silver → Gold pipeline tanımı
-│   └── semantic-model/            # Direct Lake model (TMSL / model.bim)
+│   ├── semantic-model/            # Direct Lake model (TMSL / model.bim)
+│   └── report/                    # Power BI raporu (PBIR): Subscription / RG / Yıl>Ay>Gün filtreli sayfa
 ├── local-demo/                    # Azure'suz, ücretsiz yerel demo (pandas)
 │   ├── run-demo.ps1               #   Adım adım demo
 │   ├── generate_sample_focus.py   #   Gerçek klasör yapısında örnek FOCUS verisi

@@ -9,6 +9,7 @@ Steps (each one is idempotent, so the script can be re-run safely):
   6. Run the pipeline once and wait
   7. Direct Lake semantic model "Azure Cost Model" on the Gold tables
   8. Optional daily pipeline schedule
+  9. Power BI report "Azure Cost Report" (PBIR definition in fabric/report/)
 
 Usage:
     python scripts/setup_fabric.py --capacity-name <capacity> [--workspace-name "Azure Cost Analytics"]
@@ -46,11 +47,13 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 NOTEBOOKS_DIR = REPO_ROOT / "fabric" / "notebooks"
 PIPELINE_FILE = REPO_ROOT / "fabric" / "pipelines" / "pipeline_cost_refresh.json"
 MODEL_FILE = REPO_ROOT / "fabric" / "semantic-model" / "model.bim.json"
+REPORT_DIR = REPO_ROOT / "fabric" / "report"
 AZURE_OUTPUTS = REPO_ROOT / ".azure-outputs.json"
 FABRIC_OUTPUTS = REPO_ROOT / ".fabric-outputs.json"
 
 LAKEHOUSE_NAME = "CostLakehouse"
 SEMANTIC_MODEL_NAME = "Azure Cost Model"
+REPORT_NAME = "Azure Cost Report"
 GOLD_TABLES = ["gold_fact_cost_daily", "gold_dim_date", "gold_dim_resource", "gold_dim_service", "gold_cost_monthly"]
 
 console = Console()
@@ -387,6 +390,18 @@ def deploy_semantic_model(api: Api, workspace_id: str, lakehouse_id: str) -> dic
     return item
 
 
+def deploy_report(api: Api, workspace_id: str, semantic_model_id: str) -> dict[str, Any]:
+    """Publish the PBIR report in fabric/report/ bound to the Direct Lake semantic model."""
+    parts = []
+    for path in sorted(p for p in REPORT_DIR.rglob("*") if p.is_file()):
+        rel = path.relative_to(REPORT_DIR).as_posix()
+        content = path.read_text(encoding="utf-8")
+        if rel == "definition.pbir":
+            content = content.replace("{{SEMANTIC_MODEL_ID}}", semantic_model_id)
+        parts.append({"path": rel, "payload": b64(content), "payloadType": "InlineBase64"})
+    return upsert_item(api, workspace_id, REPORT_NAME, "Report", definition={"parts": parts})
+
+
 def schedule_pipeline(api: Api, workspace_id: str, pipeline_id: str, at: str) -> None:
     url = f"/workspaces/{workspace_id}/items/{pipeline_id}/jobs/Pipeline/schedules"
     for existing in api.list(url):
@@ -438,7 +453,9 @@ def lookup_storage_id(api: Api, name: str) -> str:
 @click.option("--skip-run", is_flag=True, help="Do not run the pipeline after provisioning.")
 @click.option("--skip-semantic-model", is_flag=True, help="Do not deploy the Direct Lake semantic model.")
 @click.option("--schedule-time", default=None, help="Daily pipeline run time in UTC, e.g. 06:00.")
-def main(workspace_name, capacity_id, capacity_name, storage_account, connection_id, skip_run, skip_semantic_model, schedule_time):
+@click.option("--skip-report", is_flag=True, help="Do not publish the Power BI report.")
+def main(workspace_name, capacity_id, capacity_name, storage_account, connection_id, skip_run, skip_semantic_model,
+         schedule_time, skip_report):
     """Provision the Fabric workspace that turns Azure cost exports into a Power BI-ready model."""
     if not (capacity_id or capacity_name):
         raise click.ClickException("Provide --capacity-id or --capacity-name.")
@@ -490,11 +507,25 @@ def main(workspace_name, capacity_id, capacity_name, storage_account, connection
             step(8, "Daily schedule")
             schedule_pipeline(api, ws["id"], pipeline["id"], schedule_time)
 
+        if not skip_report:
+            step(9, "Power BI report (PBIR)")
+            model_id = state.get("semantic_model_id")
+            if not model_id:
+                existing = find_item(api, ws["id"], SEMANTIC_MODEL_NAME, "SemanticModel")
+                if not existing:
+                    raise click.ClickException("Semantic model not found; deploy it before the report.")
+                model_id = existing["id"]
+            report = deploy_report(api, ws["id"], model_id)
+            state.update(report_id=report["id"])
+
     except ApiError as exc:
         console.print(f"\n[bold red]Fabric/Azure API error[/bold red] {exc}")
         sys.exit(1)
     finally:
         if state:
+            previous = json.loads(FABRIC_OUTPUTS.read_text(encoding="utf-8")) if FABRIC_OUTPUTS.exists() else {}
+            if previous.get("workspace_id") == state.get("workspace_id"):
+                state = {**previous, **state}
             FABRIC_OUTPUTS.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
     table = Table(title="Provisioned", show_lines=True)

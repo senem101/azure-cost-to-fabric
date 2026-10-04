@@ -80,11 +80,11 @@ GOLD    gold_fact_cost_daily 1121 · gold_dim_subscription 3 · gold_dim_resourc
 | 1 | `./scripts/01-deploy-azure.ps1 -EnvironmentName demo` (çoklu abonelik: `-ExportSubscriptionIds <id1>,<id2>` veya `-AllSubscriptions`) | Portal → RG `rg-costfabric-demo` → storage; her abonelikte Cost Management → **Exports** → `focus-daily-demo`. Tam liste: [2.6 Portaldan kontrol listesi](02-azure-cost-export.md#portaldan-kontrol-listesi-adım-1-sonrası) |
 | 2 | `./scripts/02-run-cost-export.ps1 -BackfillMonths 2` | Run history'de *Completed*; storage → `costs/focus/<abonelikId>/...` klasör yapısı |
 | 3 | Fabric kapasitesini **Resume** | Portal → Fabric capacity → *Active* |
-| 4 | `python scripts/setup_fabric.py --capacity-name <kapasite> --schedule-time 06:00` | Konsoldaki 8 adım; workspace'in açılması |
+| 4 | `python scripts/setup_fabric.py --capacity-name <kapasite> --schedule-time 06:00` | Konsoldaki 9 adım; workspace'in açılması |
 | 5 | Lakehouse → `Files/costs` | Shortcut ikonu, Parquet dosyaları (kopya değil!) |
 | 6 | `02_silver_costs` notebook → çıktı | "Bronze: N satır → en güncel run'lar: M satır", abonelik ve servis bazında tablolar |
-| 7 | SQL analytics endpoint | [05-power-bi-rapor.md §5.4](05-power-bi-rapor.md#54-doğrulama) sorgusu ↔ portal Cost analysis |
-| 8 | `Azure Cost Model` → **Create report** | [05-power-bi-rapor.md §5.2](05-power-bi-rapor.md#52-raporu-oluşturma-adım-adım)'deki sayfalar |
+| 7 | SQL analytics endpoint | [05-power-bi-rapor.md §5.5](05-power-bi-rapor.md#55-doğrulama) sorgusu ↔ portal Cost analysis |
+| 8 | **Azure Cost Report** → *Maliyet Analizi* sayfası | Subscription / Resource Group / Yıl > Ay > Gün filtreleri, trend grafiğinde drill-down ([§5.2](05-power-bi-rapor.md#52-hazır-rapor-azure-cost-report)); ek sayfalar için [§5.3](05-power-bi-rapor.md#53-ek-sayfalar-oluşturma-adım-adım) |
 | 9 | Pipeline → **Schedule** | Her gün 06:00 UTC otomatik yenileme |
 | 10 | Kapasiteyi **Suspend** | Maliyet kontrolü |
 

@@ -39,7 +39,41 @@ erDiagram
 | Subscription Count | `DISTINCTCOUNT('Cost'[subscription_id])` | Maliyet üreten abonelik sayısı |
 | Line Items | `SUM('Cost'[line_items])` | Kaynak satır sayısı |
 
-## 5.2 Raporu oluşturma (adım adım)
+## 5.2 Hazır rapor: "Azure Cost Report"
+
+`setup_fabric.py` (adım 9), `fabric/report/` klasöründeki raporu **PBIR** formatında (her sayfa ve görsel ayrı bir JSON dosyası) yayımlar ve modele bağlar. Rapor Power BI Desktop'ta da açılıp düzenlenebilir.
+
+**Sayfa: Maliyet Analizi**
+
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ Azure Maliyet Analizi                                                         │
+├──────────────────┬────────────────────────────────────────────────────────────┤
+│ Subscription  ▾  │ [Toplam maliyet] [Günlük ortalama] [Kaynak sayısı] [Sub #] │
+│ Resource Group ▾ ├────────────────────────────────────────────────────────────┤
+│ Tarih aralığı    │ Maliyet trendi — Yıl ▸ Ay ▸ Gün (drill-down)               │
+│ [====|====]      │                                                            │
+│ Yıl > Ay > Gün   ├──────────────────────────────────┬─────────────────────────┤
+│ ▸ 2026           │ Subscription / Resource Group    │ Servise göre maliyet    │
+│   ▸ Sep          │ tablosu                          │                         │
+│     □ 1 □ 2 ...  │                                  │                         │
+└──────────────────┴──────────────────────────────────┴─────────────────────────┘
+```
+
+| Görsel | Alanlar | Not |
+|---|---|---|
+| **Subscription** slicer (açılır liste, çoklu seçim, arama) | `Subscription[Subscription]` | Görsel filtresi `Line Items > 0` → yalnızca seçili tarih/RG'de maliyeti olanlar listelenir |
+| **Resource Group** slicer (açılır liste) | `Resource[Resource Group]` | Aynı filtre sayesinde seçili subscription'a ait RG'ler listelenir. *(Blank)* = kaynağa bağlı olmayan (abonelik düzeyi) maliyet |
+| **Tarih aralığı** slicer (Between) | `Date[Date]` | Gün hassasiyetinde başlangıç–bitiş seçimi |
+| **Yıl > Ay > Gün** hiyerarşik slicer | `Date[Year]` → `Date[Month]` → `Date[Day]` | Yıl, ay veya tek tek gün seçilebilir (ör. sadece Eylül, ya da 24–28 Eylül) |
+| 4 × **Card** | `Effective Cost`, `Avg Daily Cost`, `Resource Count`, `Subscription Count` | Tüm slicer'lara tepki verir |
+| **Column chart** — Maliyet trendi | Eksen: `Year` → `Year Month` → `Date`; Y: `Effective Cost` | Ay seviyesinde açılır. Görselin üstündeki ⬇ / ⬆ okları ile **yıl / ay / gün** granülaritesine geçilir; bir sütuna tıklayıp drill-down yapılabilir |
+| **Table** | `Subscription`, `Resource Group`, `Effective Cost`, `Avg Daily Cost`, `Resource Count` | Maliyete göre azalan |
+| **Bar chart** | `Service[Service]`, `Effective Cost` | Maliyete göre azalan |
+
+> **Raporu değiştirmek:** Portalda **Edit** ile düzenleyip kaydedebilirsiniz. Ancak `setup_fabric.py` bir sonraki çalıştırmada raporu `fabric/report/` içeriğiyle **üzerine yazar**. Kalıcı değişiklik için ya raporu farklı adla kaydedin (*File → Save as*) ya da Fabric **Git integration** ile PBIR dosyalarını repoya geri alın.
+
+## 5.3 Ek sayfalar oluşturma (adım adım)
 
 1. Fabric workspace → **Azure Cost Model** → `…` → **Create report** (veya Power BI Desktop → *OneLake data hub* → modeli seç → **Connect**).
 2. Aşağıdaki sayfa düzenini kurun. `local-demo/output/cost_report.html` aynı görsellerin önizlemesidir.
@@ -73,14 +107,14 @@ erDiagram
 
 > **İpucu:** `Date[Year Month]` kolonunun *Sort by column* ayarı `Year Month Sort` olarak hazır gelir; aylar kronolojik sıralanır.
 
-## 5.3 Ek fikirler
+## 5.4 Ek fikirler
 
 - **Anomali tespiti:** Günlük trend çizgisinde *Analytics → Find anomalies* açın. Örnek veride 14–16. günlerdeki Azure OpenAI artışı otomatik işaretlenir.
 - **Bütçe:** Bir `Budget` tablosu (ay × servis × hedef) ekleyip `Effective Cost` ile karşılaştırın.
 - **Uyarılar:** Rapordaki bir kartı **Set alert** ile Data Activator'a bağlayıp eşik aşımında Teams/e-posta bildirimi gönderin.
 - **Copilot:** Model, Copilot for Power BI ile "Geçen aya göre en çok artan 5 servis hangisi?" gibi sorulara hazırdır.
 
-## 5.4 Doğrulama
+## 5.5 Doğrulama
 
 Fabric'te **SQL analytics endpoint** üzerinden mutabakat:
 

@@ -29,6 +29,7 @@ flowchart TD
     E --> F[6. Pipeline'ı çalıştır<br/>Bronze → Silver → Gold]
     F --> G[7. Direct Lake<br/>semantic model + refresh]
     G --> H[8. Günlük zamanlama<br/>opsiyonel]
+    H --> I[9. Power BI raporu<br/>Azure Cost Report]
 ```
 
 | Adım | API | Açıklama |
@@ -41,8 +42,9 @@ flowchart TD
 | **6. İlk çalıştırma** | `POST /items/{id}/jobs/instances?jobType=Pipeline` | İş tamamlanana kadar `Location` URL'i yoklanır (ilk çalışmada Spark oturumu açılışı ~2–4 dk) |
 | **7. Semantic model** | `POST /semanticModels` (model.bim + definition.pbism), `POST .../refreshes` | Lakehouse SQL endpoint metadata'sı yenilenir, Direct Lake model oluşturulur ve refresh edilir |
 | **8. Zamanlama** | `POST /items/{id}/jobs/Pipeline/schedules` | `--schedule-time 06:00` → her gün 06:00 UTC'de pipeline çalışır (export genelde gece biter) |
+| **9. Rapor** | `POST /items` (type `Report`, PBIR definition) | `fabric/report/` klasöründeki rapor, `definition.pbir` içindeki `{{SEMANTIC_MODEL_ID}}` modelin ID'siyle değiştirilerek yayımlanır. Sayfa içeriği: [05-power-bi-rapor.md §5.2](05-power-bi-rapor.md#52-hazır-rapor-azure-cost-report) |
 
-Sonunda `.fabric-outputs.json` dosyasına workspace, lakehouse, pipeline, notebook ve model ID'leri yazılır.
+Sonunda `.fabric-outputs.json` dosyasına workspace, lakehouse, pipeline, notebook, model ve rapor ID'leri yazılır (önceki çalıştırmanın değerleriyle birleştirilir).
 
 ## 3.3 Parametreler
 
@@ -55,9 +57,13 @@ Sonunda `.fabric-outputs.json` dosyasına workspace, lakehouse, pipeline, notebo
 | `--skip-run` | kapalı | Pipeline'ı çalıştırma |
 | `--skip-semantic-model` | kapalı | Semantic model oluşturma |
 | `--schedule-time` | — | Günlük çalışma saati (UTC, `HH:MM`) |
+| `--skip-report` | kapalı | Power BI raporunu yayımlama |
 
 > **Yarıda kalırsa:** Script idempotenttir; var olan öğeleri yeniden kullanır. Bağlantı oluştuysa tekrar çalıştırırken `.fabric-outputs.json` içindeki `connection_id`'yi verin ve pipeline zaten çalıştıysa `--skip-run` ekleyin:
 > `python scripts/setup_fabric.py --capacity-name <kapasite> --connection-id <guid> --skip-run --schedule-time 06:00`
+>
+> **Sadece raporu (yeniden) yayımlamak için:**
+> `python scripts/setup_fabric.py --capacity-name <kapasite> --connection-id <guid> --skip-run --skip-semantic-model`
 
 ## 3.4 Manuel alternatif: bağlantıyı portaldan oluşturma
 

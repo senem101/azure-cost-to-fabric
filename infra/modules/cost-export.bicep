@@ -12,6 +12,12 @@ param scheduleStart string
 
 resource costExport 'Microsoft.CostManagement/exports@2025-03-01' = {
   name: exportName
+  // Managed identity lets the export write with Entra ID auth, so the storage account can keep shared key access disabled.
+  // Cost Management grants it Storage Blob Data Contributor on the container (deployer needs roleAssignments/write).
+  location: 'global'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     exportDescription: 'Daily FOCUS cost export consumed by Microsoft Fabric'
     definition: {
@@ -50,3 +56,4 @@ resource costExport 'Microsoft.CostManagement/exports@2025-03-01' = {
 
 output exportName string = costExport.name
 output exportId string = costExport.id
+output exportPrincipalId string = costExport.identity.principalId

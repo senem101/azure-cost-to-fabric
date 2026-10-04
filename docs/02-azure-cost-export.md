@@ -48,6 +48,7 @@ AZURE_SUBSCRIPTION_ID        9dc2...
 
 | Özellik | Değer | Açıklama |
 |---|---|---|
+| `identity` | `SystemAssigned` (location `global`) | Export, storage'a Entra ID ile yazar; paylaşılan anahtar gerekmez. Cost Management bu kimliğe `costs` container'ında *Storage Blob Data Contributor* rolünü otomatik atar |
 | `definition.type` | `FocusCost` | Actual + amortized maliyeti tek veri setinde veren FOCUS formatı |
 | `dataSet.configuration.dataVersion` | `1.0` | FOCUS şema sürümü |
 | `timeframe` | `MonthToDate` | Her çalışmada ayın başından bugüne kadar olan veri |

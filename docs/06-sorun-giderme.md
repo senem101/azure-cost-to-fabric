@@ -14,8 +14,11 @@ FOCUS export'u EA, MCA ve Pay-as-you-go abonelikleri destekler. Bazı **Sponsors
 ### Export çalıştı ama dosya yok
 - `runHistory` içinde `status` alanına bakın: `az rest --method get --url "<COST_EXPORT_IDS içindeki ID>?api-version=2025-03-01&$expand=runHistory"`.
 - **Yeni abonelik:** Maliyet verisi ilk 24–48 saat oluşmayabilir; boş ay için dosya yazılmaz.
-- Storage'da `allowSharedKeyAccess: false` yapılmışsa export yazamaz (bkz. [Mimari → Güvenlik](01-mimari.md#güvenlik-modeli)).
+- Export'un managed identity'sinin storage'da rolü olmalı: `az role assignment list --assignee <export identity.principalId> --all -o table` → `costs` container'ında *Storage Blob Data Contributor*. Yoksa export'u portaldan açıp **Save** edin (rol yeniden atanır) veya rolü elle verin.
 - Storage firewall'u "Selected networks" ise *Allow trusted Microsoft services* işaretli olmalı.
+
+### `Key-based authentication is currently disabled on this storage account`
+Export **managed identity olmadan** oluşturulmaya çalışılıyor (eski şablon veya portal'da "Use system-assigned managed identity" kapalı). Bu repo export'ları `identity: SystemAssigned` ile oluşturur. Kurumsal tenant'larda "Azure Security Baseline" gibi politikalar paylaşılan anahtarı zorla kapatır; anahtar erişimini açmak yerine managed identity kullanın.
 
 ### `az storage fs file list` → `AuthorizationPermissionMismatch`
 Rol ataması yayılıyor (~5 dk). Bekleyip tekrar deneyin.

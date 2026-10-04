@@ -102,7 +102,7 @@ try {
 } finally { Remove-Item $paramsFile -ErrorAction SilentlyContinue }
 
 $flat = [ordered]@{}
-foreach ($p in $outputs.PSObject.Properties) { $flat[$p.Name] = $p.Value.value }
+foreach ($p in $outputs.PSObject.Properties) { $flat[$p.Name.ToUpperInvariant()] = $p.Value.value }  # az CLI mangles key casing (e.g. azurE_...)
 
 Step '4/5 Billing-scope export'
 if ($PSCmdlet.ParameterSetName -eq 'Billing') {
@@ -110,6 +110,8 @@ if ($PSCmdlet.ParameterSetName -eq 'Billing') {
     $exportId = "$scope/providers/Microsoft.CostManagement/exports/$($flat.COST_EXPORT_NAME)"
     $start = (Get-Date).ToUniversalTime().Date.AddDays(1)
     $body = @{
+        location   = 'global'
+        identity   = @{ type = 'SystemAssigned' }
         properties = @{
             exportDescription     = 'Daily FOCUS cost export consumed by Microsoft Fabric (billing scope)'
             definition            = @{ type = 'FocusCost'; timeframe = 'MonthToDate'; dataSet = @{ granularity = 'Daily'; configuration = @{ dataVersion = '1.0' } } }

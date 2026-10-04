@@ -70,9 +70,9 @@ FOCUS (FinOps Open Cost and Usage Specification), bulut sağlayıcıları arası
 flowchart LR
     U["Kurulumu yapan kullanıcı"] -- "Storage Blob Data Reader<br/>(doğrulama için)" --> ST[(Storage)]
     WI["Fabric workspace identity"] -- "Storage Blob Data Reader" --> ST
-    CM["Cost Management<br/>(Microsoft first-party)"] -- "export yazar" --> ST
+    CM["Cost Management export<br/>(system-assigned managed identity)"] -- "Storage Blob Data Contributor<br/>(yalnız costs container)" --> ST
 ```
 
-- Hiçbir yerde hesap anahtarı veya SAS token saklanmaz.
+- Hiçbir yerde hesap anahtarı veya SAS token saklanmaz; storage'da **paylaşılan anahtar erişimi kapalıdır** (`allowSharedKeyAccess: false`).
 - Storage'da `allowBlobPublicAccess: false`, `minimumTlsVersion: TLS1_2`.
-- Cost Management export'u kendi first-party kimliğiyle yazar; bunun için storage'da paylaşılan anahtar erişimi açık kalmalıdır (Microsoft'un mevcut gereksinimi).
+- Her export'un kendi **managed identity**'si vardır. Export oluşturulurken Cost Management bu kimliğe `costs` container'ında *Storage Blob Data Contributor* rolünü **kendisi** atar. Bunun için deploy eden kullanıcının storage üzerinde `Microsoft.Authorization/roleAssignments/write` yetkisi (Owner veya User Access Administrator) olmalıdır.

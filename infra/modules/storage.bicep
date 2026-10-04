@@ -26,7 +26,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     minimumTlsVersion: 'TLS1_2'
     supportsHttpsTrafficOnly: true
     allowBlobPublicAccess: false
-    allowSharedKeyAccess: true // used by the Cost Management export service when no managed identity is configured
+    allowSharedKeyAccess: false // exports use a managed identity; Fabric uses workspace identity
     networkAcls: {
       defaultAction: 'Allow'
       bypass: 'AzureServices'

@@ -56,6 +56,9 @@ Sonunda `.fabric-outputs.json` dosyasına workspace, lakehouse, pipeline, notebo
 | `--skip-semantic-model` | kapalı | Semantic model oluşturma |
 | `--schedule-time` | — | Günlük çalışma saati (UTC, `HH:MM`) |
 
+> **Yarıda kalırsa:** Script idempotenttir; var olan öğeleri yeniden kullanır. Bağlantı oluştuysa tekrar çalıştırırken `.fabric-outputs.json` içindeki `connection_id`'yi verin ve pipeline zaten çalıştıysa `--skip-run` ekleyin:
+> `python scripts/setup_fabric.py --capacity-name <kapasite> --connection-id <guid> --skip-run --schedule-time 06:00`
+
 ## 3.4 Manuel alternatif: bağlantıyı portaldan oluşturma
 
 Kuruluşunuzda workspace identity kullanılamıyorsa (ör. tenant ayarı kapalı) bağlantıyı elle oluşturup ID'sini verebilirsiniz:

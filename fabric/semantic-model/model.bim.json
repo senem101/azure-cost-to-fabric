@@ -20,6 +20,14 @@
             "formatString": "yyyy-mm-dd"
           },
           {
+            "name": "subscription_id",
+            "dataType": "string",
+            "sourceColumn": "subscription_id",
+            "lineageTag": "7c5a4706-465f-55dc-8028-a59b66e9372f",
+            "summarizeBy": "none",
+            "isHidden": true
+          },
+          {
             "name": "resource_key",
             "dataType": "string",
             "sourceColumn": "resource_key",
@@ -209,9 +217,16 @@
           },
           {
             "name": "Resource Count",
-            "expression": "CALCULATE ( DISTINCTCOUNT ( 'Cost'[resource_key] ), 'Cost'[resource_key] <> \"unassigned\" )",
+            "expression": "CALCULATE ( DISTINCTCOUNT ( 'Cost'[resource_key] ), NOT ( LEFT ( 'Cost'[resource_key], 10 ) = \"unassigned\" ) )",
             "formatString": "#,0",
             "lineageTag": "199dbab9-1e63-56e4-9b0a-002609a20fa7",
+            "displayFolder": "Cost"
+          },
+          {
+            "name": "Subscription Count",
+            "expression": "DISTINCTCOUNT ( 'Cost'[subscription_id] )",
+            "formatString": "#,0",
+            "lineageTag": "65a1f67f-7e7a-5384-8944-f5918a8756fd",
             "displayFolder": "Cost"
           },
           {
@@ -333,6 +348,46 @@
         "dataCategory": "Time"
       },
       {
+        "name": "Subscription",
+        "lineageTag": "5730f770-9717-50ea-9180-9ce51b9bc7b7",
+        "columns": [
+          {
+            "name": "Subscription Id",
+            "dataType": "string",
+            "sourceColumn": "subscription_id",
+            "lineageTag": "182fe180-c802-57d4-969e-be5703fbf12d",
+            "summarizeBy": "none",
+            "isKey": true
+          },
+          {
+            "name": "Subscription",
+            "dataType": "string",
+            "sourceColumn": "subscription_name",
+            "lineageTag": "19fd5f45-4ff1-511c-9fab-23e4284e31e7",
+            "summarizeBy": "none"
+          },
+          {
+            "name": "Billing Account",
+            "dataType": "string",
+            "sourceColumn": "billing_account_name",
+            "lineageTag": "227d1f99-3c43-5904-ab8d-658857ad0c22",
+            "summarizeBy": "none"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Subscription-partition",
+            "mode": "directLake",
+            "source": {
+              "type": "entity",
+              "entityName": "gold_dim_subscription",
+              "schemaName": "dbo",
+              "expressionSource": "DatabaseQuery"
+            }
+          }
+        ]
+      },
+      {
         "name": "Resource",
         "lineageTag": "8d8fc509-ea02-59c4-828b-1d7993560f00",
         "columns": [
@@ -378,14 +433,16 @@
             "dataType": "string",
             "sourceColumn": "subscription_id",
             "lineageTag": "cc37e776-2a04-5df3-925d-aa1651986da0",
-            "summarizeBy": "none"
+            "summarizeBy": "none",
+            "isHidden": true
           },
           {
             "name": "Subscription",
             "dataType": "string",
             "sourceColumn": "subscription_name",
             "lineageTag": "74da76fe-5ac1-5f40-904e-01707632c8c7",
-            "summarizeBy": "none"
+            "summarizeBy": "none",
+            "isHidden": true
           },
           {
             "name": "Region",
@@ -481,6 +538,14 @@
             "summarizeBy": "none"
           },
           {
+            "name": "subscription_id",
+            "dataType": "string",
+            "sourceColumn": "subscription_id",
+            "lineageTag": "aea783e7-414c-57ba-b8fe-f387dcaf4d96",
+            "summarizeBy": "none",
+            "isHidden": true
+          },
+          {
             "name": "service_name",
             "dataType": "string",
             "sourceColumn": "service_name",
@@ -560,6 +625,13 @@
         "toColumn": "Date"
       },
       {
+        "name": "c1854511-f040-5cc6-bde8-65b5e5ef4a23",
+        "fromTable": "Cost",
+        "fromColumn": "subscription_id",
+        "toTable": "Subscription",
+        "toColumn": "Subscription Id"
+      },
+      {
         "name": "7242497b-6731-52c9-9142-9d75f58b70a8",
         "fromTable": "Cost",
         "fromColumn": "resource_key",
@@ -572,6 +644,13 @@
         "fromColumn": "service_name",
         "toTable": "Service",
         "toColumn": "Service"
+      },
+      {
+        "name": "8e6b1fdf-9b49-52fc-bdc8-b3c7b9a65dcb",
+        "fromTable": "Monthly Summary",
+        "fromColumn": "subscription_id",
+        "toTable": "Subscription",
+        "toColumn": "Subscription Id"
       },
       {
         "name": "73898572-35ac-589d-9beb-4dc5948ff98c",

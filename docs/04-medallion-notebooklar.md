@@ -7,6 +7,7 @@ flowchart LR
     F["Files/costs/**/*.parquet<br/>(shortcut)"] --> B["bronze_costs<br/>ham + lineage"]
     B --> S["silver_costs<br/>en güncel run, tipli"]
     S --> FD["gold_fact_cost_daily"]
+    S --> DSub["gold_dim_subscription"]
     S --> DR["gold_dim_resource"]
     S --> DS["gold_dim_service"]
     S --> DD["gold_dim_date"]
@@ -19,12 +20,12 @@ flowchart LR
 
 | İşlem | Detay |
 |---|---|
-| Okuma | `Files/costs` altı `recursiveFileLookup` ile taranır, `pathGlobFilter = *.parquet` ile `manifest.json` gibi dosyalar atlanır |
+| Okuma | `Files/costs` altı `recursiveFileLookup` ile taranır (tüm abonelik klasörleri dahil), `pathGlobFilter = *.parquet` ile `manifest.json` gibi dosyalar atlanır |
 | Kolon adları | Delta'da geçersiz karakterler (`boşluk , ; { } ( ) = \n \t`) `_` ile değiştirilir |
 | Lineage | `_source_file` (dosya yolu), `_file_modification_time`, `_ingestion_timestamp` |
 | Yazma | `overwrite` + `overwriteSchema` → her çalıştırma tüm export'u yeniden okur |
 
-> **Neden her seferinde overwrite?** Tek bir abonelik için export genelde ayda birkaç MB'tır. Tam yeniden okuma, incremental mantığa göre çok daha basit ve hatasızdır. Çok büyük EA/MCA hesaplarında (GB'lar) dönem bazlı `replaceWhere` kullanılabilir.
+> **Neden her seferinde overwrite?** Bir aboneliğin export'u genelde ayda birkaç MB'tır; onlarca abonelikte bile tam yeniden okuma, incremental mantığa göre çok daha basit ve hatasızdır. Çok büyük EA/MCA hesaplarında (GB'lar) dönem bazlı `replaceWhere` kullanılabilir.
 
 ## 4.2 `02_silver_costs` — Temiz, tekil maliyet kayıtları
 
@@ -38,13 +39,16 @@ Her export run'ı **ayın başından o güne kadar olan tüm veriyi** içerir. A
 └── d092a721/  →  1–14 Ekim  (bugünkü run)   ✓ tutulur
 ```
 
-Silver, dosya yolundan **fatura dönemi** ve **run ID**'yi çıkarır, her dönem için en yeni dosya zamanına sahip run'ı seçer:
+Silver, dosya yolundan **export klasörü**, **fatura dönemi** ve **run ID**'yi çıkarır; her *(export klasörü, dönem)* çifti için en yeni dosya zamanına sahip run'ı seçer:
 
 ```python
+.withColumn("_export_path",    F.regexp_extract("_source_file", r"^(.*)/\d{8}-\d{8}/", 1))
 .withColumn("_billing_period", F.regexp_extract("_source_file", r"/(\d{8}-\d{8})/", 1))
 .withColumn("_export_run",     F.regexp_extract("_source_file", r"/\d{8}-\d{8}/([^/]+)/", 1))
-# dönem başına max(_file_modification_time) → row_number() = 1
+# RUN_KEY = ["_export_path", "_billing_period"] başına max(_file_modification_time) → row_number() = 1
 ```
+
+> **Neden `_export_path` da anahtarda?** Birden fazla abonelikte her abonelik kendi export'unu (`focus/<abonelikId>/focus-daily-demo/`) yazar. Anahtar yalnızca dönem olsaydı, o ay en son çalışan aboneliğin run'ı "en güncel" sayılır ve **diğer aboneliklerin tüm verisi atılırdı**. Yerel demo bu farkı ekrana yazdırır.
 
 > Satır bazında `dropDuplicates` **yapılmaz**: FOCUS'ta birebir aynı görünen iki satır meşru olabilir (ör. aynı kaynağın iki ayrı meter'ı). Tekrarlar yalnızca eski run'lardan gelir.
 
@@ -70,15 +74,16 @@ Kendi etiket standardınız farklıysa `02_silver_costs` notebook'undaki bu sat�
 
 | Tablo | Tanecik (grain) | Önemli kolonlar |
 |---|---|---|
-| `gold_fact_cost_daily` | gün × kaynak × servis × meter × charge/pricing kategorisi | `billed_cost`, `effective_cost`, `list_cost`, `savings`, `consumed_quantity`, `line_items` |
+| `gold_fact_cost_daily` | gün × abonelik × kaynak × servis × meter × charge/pricing kategorisi | `subscription_id`, `billed_cost`, `effective_cost`, `list_cost`, `savings`, `consumed_quantity`, `line_items` |
+| `gold_dim_subscription` | abonelik | `subscription_id`, `subscription_name`, `billing_account_name` |
 | `gold_dim_resource` | kaynak | `resource_name`, `resource_type`, `resource_group`, `subscription_name`, `region`, `tag_*` |
 | `gold_dim_service` | servis | `service_name`, `service_category` |
 | `gold_dim_date` | gün (tam takvim yılları) | `year`, `quarter`, `month_name`, `year_month`, `day_name`, `is_weekend` |
-| `gold_cost_monthly` | ay × servis | `effective_cost`, `previous_month_cost`, `mom_change`, `mom_change_pct`, `ytd_cost` |
+| `gold_cost_monthly` | ay × abonelik × servis | `effective_cost`, `previous_month_cost`, `mom_change`, `mom_change_pct`, `ytd_cost` |
 
 Notlar:
 
-- Kaynağı olmayan satırlar (rezervasyon satın alma, destek planı, vergi) `resource_key = 'unassigned'` alır ve `gold_dim_resource`'ta **"(no resource)"** olarak görünür. Böylece toplamlar kaybolmaz.
+- Kaynağı olmayan satırlar (rezervasyon satın alma, destek planı, vergi) `resource_key = 'unassigned/<abonelikId>'` alır ve `gold_dim_resource`'ta **"(no resource)"** olarak görünür. Abonelik başına ayrı anahtar sayesinde bu maliyetler de doğru aboneliğe bağlı kalır; toplamlar kaybolmaz.
 - Para kolonları `decimal(18,4)` tipindedir (Power BI'da yuvarlama hatası olmaz).
 - `gold_dim_date`, verinin kapsadığı yılların **tamamını** içerir (Power BI time-intelligence fonksiyonları kesintisiz tarih tablosu ister).
 - Notebook sonunda **mutabakat kontrolü** yapılır: `sum(silver.effective_cost) == sum(gold_fact.effective_cost)`, aksi hâlde notebook hata verir ve pipeline durur.

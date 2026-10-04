@@ -40,11 +40,13 @@ TEMPLATE = """<!doctype html>
 <div class="wrap">
  <div class="kpis">__KPIS__</div>
  <div class="grid"><div class="card"><h3>Daily effective cost by service category</h3><canvas id="daily"></canvas></div>
-  <div class="card"><h3>Cost by resource group (period)</h3><canvas id="rg"></canvas></div></div>
+  <div class="card"><h3>Cost by subscription (period)</h3><canvas id="sub"></canvas></div></div>
  <div class="grid"><div class="card"><h3>Monthly effective cost by service</h3><canvas id="monthly"></canvas></div>
-  <div class="card"><h3>Cost by environment tag</h3><canvas id="env"></canvas></div></div>
+  <div class="card"><h3>Cost by resource group (period)</h3><canvas id="rg"></canvas></div></div>
  <div class="grid"><div class="card"><h3>Top 10 resources</h3>__TOP__</div>
-  <div class="card"><h3>Month-over-month by service (__LASTMONTH__)</h3>__MOM__</div></div>
+  <div class="card"><h3>Cost by environment tag</h3><canvas id="env"></canvas></div></div>
+ <div class="grid"><div class="card"><h3>Month-over-month by service (__LASTMONTH__, all subscriptions)</h3>__MOM__</div>
+  <div class="card"><h3>Subscriptions (__LASTMONTH__)</h3>__SUBS__</div></div>
 </div>
 <script>
 const D=__DATA__;
@@ -53,6 +55,7 @@ const ds=(series)=>Object.entries(series).map(([k,v],i)=>({label:k,data:v,backgr
 new Chart(daily,{type:'line',data:{labels:D.daily.labels,datasets:ds(D.daily.series)},options:{plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true}}}});
 new Chart(monthly,{type:'bar',data:{labels:D.monthly.labels,datasets:ds(D.monthly.series)},options:{plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true},y:{stacked:true}}}});
 new Chart(rg,{type:'doughnut',data:{labels:D.rg.labels,datasets:[{data:D.rg.values,backgroundColor:palette}]},options:{plugins:{legend:{position:'right'}}}});
+new Chart(sub,{type:'doughnut',data:{labels:D.sub.labels,datasets:[{data:D.sub.values,backgroundColor:palette}]},options:{plugins:{legend:{position:'right'}}}});
 new Chart(env,{type:'bar',data:{labels:D.env.labels,datasets:[{label:'Effective cost',data:D.env.values,backgroundColor:'#0b6cbf'}]},options:{indexAxis:'y',plugins:{legend:{display:false}}}});
 </script></body></html>"""
 
@@ -70,11 +73,17 @@ def main() -> None:
     g = Path(args.gold)
 
     fact = pd.read_parquet(g / "gold_fact_cost_daily.parquet")
-    res = pd.read_parquet(g / "gold_dim_resource.parquet")
+    subs = pd.read_parquet(g / "gold_dim_subscription.parquet")
+    res = pd.read_parquet(g / "gold_dim_resource.parquet").drop(columns=["subscription_id", "subscription_name"])
     svc = pd.read_parquet(g / "gold_dim_service.parquet")
     monthly = pd.read_parquet(g / "gold_cost_monthly.parquet")
 
-    df = fact.merge(res, on="resource_key", how="left").merge(svc, on="service_name", how="left")
+    df = (
+        fact.merge(res, on="resource_key", how="left")
+        .merge(subs, on="subscription_id", how="left")
+        .merge(svc, on="service_name", how="left")
+    )
+    unassigned = df["resource_key"].str.startswith("unassigned")
     df["charge_date"] = pd.to_datetime(df["charge_date"])
     df["year_month"] = df["charge_date"].dt.strftime("%Y-%m")
     cur = df["billing_currency"].dropna().iloc[0] if df["billing_currency"].notna().any() else ""
@@ -94,7 +103,8 @@ def main() -> None:
         ("MoM change", f"{mom:+.1%}", "up" if mom > 0 else "down"),
         (f"Month to date ({current_month})", money(mtd, cur), ""),
         ("Savings vs list", money(df.savings.sum(), cur), "down"),
-        ("Services / resources", f"{df.service_name.nunique()} / {res[res.resource_key != 'unassigned'].shape[0]}", ""),
+        ("Subscriptions / services / resources",
+         f"{df.subscription_id.nunique()} / {df.service_name.nunique()} / {df.loc[~unassigned, 'resource_key'].nunique()}", ""),
     ]
     kpi_html = "".join(f'<div class="kpi"><div class="l">{l}</div><div class="v {c}">{v}</div></div>' for l, v, c in kpis)
 
@@ -102,9 +112,10 @@ def main() -> None:
     mon = df.pivot_table(index="year_month", columns="service_name", values="effective_cost", aggfunc="sum").fillna(0)
     rg = df.groupby("resource_group")["effective_cost"].sum().sort_values(ascending=False)
     env = df.groupby("tag_environment")["effective_cost"].sum().sort_values(ascending=False)
+    sub = df.groupby("subscription_name")["effective_cost"].sum().sort_values(ascending=False)
 
     top = (
-        df[df.resource_key != "unassigned"]
+        df[~unassigned]
         .groupby(["resource_name", "resource_group", "service_name"])["effective_cost"].sum()
         .sort_values(ascending=False).head(10).reset_index()
     )
@@ -113,12 +124,31 @@ def main() -> None:
         for r in top.itertuples()
     ) + "</table>"
 
-    lm = monthly[monthly.year_month == last_full].sort_values("effective_cost", ascending=False)
+    lm_all = monthly[monthly.year_month == last_full]
+    lm = (
+        lm_all.groupby("service_name", as_index=False)[["effective_cost", "previous_month_cost"]]
+        .sum(min_count=1)
+        .sort_values("effective_cost", ascending=False)
+    )
+    lm["mom_change_pct"] = (lm["effective_cost"] - lm["previous_month_cost"]) / lm["previous_month_cost"]
     mom_html = "<table><tr><th>Service</th><th>Cost</th><th>Prev.</th><th>MoM</th></tr>" + "".join(
         f"<tr><td>{r.service_name}</td><td class='n'>{money(r.effective_cost, cur)}</td>"
         f"<td class='n'>{'' if pd.isna(r.previous_month_cost) else money(r.previous_month_cost, cur)}</td>"
         f"<td class='n {'up' if (r.mom_change_pct or 0) > 0 else 'down'}'>{'' if pd.isna(r.mom_change_pct) else f'{r.mom_change_pct:+.1%}'}</td></tr>"
         for r in lm.itertuples()
+    ) + "</table>"
+
+    ls = (
+        lm_all.merge(subs, on="subscription_id", how="left")
+        .groupby("subscription_name", as_index=False)[["effective_cost", "previous_month_cost"]].sum(min_count=1)
+        .sort_values("effective_cost", ascending=False)
+    )
+    ls["mom_change_pct"] = (ls["effective_cost"] - ls["previous_month_cost"]) / ls["previous_month_cost"]
+    subs_html = "<table><tr><th>Subscription</th><th>Cost</th><th>Prev.</th><th>MoM</th></tr>" + "".join(
+        f"<tr><td>{r.subscription_name}</td><td class='n'>{money(r.effective_cost, cur)}</td>"
+        f"<td class='n'>{'' if pd.isna(r.previous_month_cost) else money(r.previous_month_cost, cur)}</td>"
+        f"<td class='n {'up' if (r.mom_change_pct or 0) > 0 else 'down'}'>{'' if pd.isna(r.mom_change_pct) else f'{r.mom_change_pct:+.1%}'}</td></tr>"
+        for r in ls.itertuples()
     ) + "</table>"
 
     data = {
@@ -127,6 +157,7 @@ def main() -> None:
         "monthly": {"labels": list(mon.index), "series": {c: mon[c].round(2).tolist() for c in mon.columns}},
         "rg": {"labels": list(rg.index), "values": rg.round(2).tolist()},
         "env": {"labels": list(env.index), "values": env.round(2).tolist()},
+        "sub": {"labels": list(sub.index), "values": sub.round(2).tolist()},
     }
 
     html = (
@@ -134,6 +165,7 @@ def main() -> None:
         .replace("__KPIS__", kpi_html)
         .replace("__TOP__", top_html)
         .replace("__MOM__", mom_html)
+        .replace("__SUBS__", subs_html)
         .replace("__LASTMONTH__", last_full)
         .replace("__SUBTITLE__", f"{months[0]} → {current_month} · source: Gold tables (local demo) · currency {cur}")
     )

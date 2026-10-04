@@ -19,10 +19,12 @@ from pathlib import Path
 
 import pandas as pd
 
+EXPORT_PATH_RE = re.compile(r"^(.*)/\d{8}-\d{8}/")
 PERIOD_RE = re.compile(r"/(\d{8}-\d{8})/")
 RUN_RE = re.compile(r"/\d{8}-\d{8}/([^/]+)/")
 RG_RE = re.compile(r"/resourcegroups/([^/]+)", re.IGNORECASE)
 UNASSIGNED = "unassigned"
+RUN_KEY = ["_export_path", "_billing_period"]
 
 
 def banner(title: str) -> None:
@@ -65,20 +67,35 @@ def bronze(input_dir: Path) -> pd.DataFrame:
 # ─── Silver ──────────────────────────────────────────────────────────────────
 
 def keep_latest_export_run(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep the newest run per (export folder, billing period); each subscription has its own export folder."""
     df = df.copy()
+    df["_export_path"] = df["_source_file"].map(lambda p: (EXPORT_PATH_RE.search(p) or [None, ""])[1])
     df["_billing_period"] = df["_source_file"].map(lambda p: (PERIOD_RE.search(p) or [None, ""])[1])
     df["_export_run"] = df["_source_file"].map(lambda p: (RUN_RE.search(p) or [None, ""])[1])
 
     runs = (
+        df.groupby([*RUN_KEY, "_export_run"], as_index=False)["_file_modification_time"].max()
+        .sort_values("_file_modification_time", ascending=False)
+        .drop_duplicates(RUN_KEY)
+    )
+    run_counts = df.groupby(RUN_KEY)["_export_run"].nunique()
+    print("  latest export run per export folder and billing period:")
+    for _, r in runs.sort_values(RUN_KEY).iterrows():
+        export = "/".join(r["_export_path"].split("/")[-2:])
+        total = run_counts[(r["_export_path"], r["_billing_period"])]
+        print(f"    {export:<55} {r['_billing_period']}  run {r['_export_run'][:8]}...  ({total} run(s) found)")
+
+    naive = (
         df.groupby(["_billing_period", "_export_run"], as_index=False)["_file_modification_time"].max()
         .sort_values("_file_modification_time", ascending=False)
         .drop_duplicates("_billing_period")
     )
-    print("  latest export run per billing period:")
-    for _, r in runs.sort_values("_billing_period").iterrows():
-        total = df[df["_billing_period"] == r["_billing_period"]]["_export_run"].nunique()
-        print(f"    {r['_billing_period']}  run {r['_export_run'][:8]}...  ({total} run(s) found)")
-    return df.merge(runs[["_billing_period", "_export_run"]], on=["_billing_period", "_export_run"])
+    naive_rows = len(df.merge(naive[["_billing_period", "_export_run"]], on=["_billing_period", "_export_run"]))
+    kept_rows = len(df.merge(runs[[*RUN_KEY, "_export_run"]], on=[*RUN_KEY, "_export_run"]))
+    if naive_rows != kept_rows:
+        print(f"  note: keying on billing period alone would keep only {naive_rows} of {kept_rows} rows "
+              f"(other subscriptions' exports would be dropped)")
+    return df.merge(runs[[*RUN_KEY, "_export_run"]], on=[*RUN_KEY, "_export_run"])
 
 
 def parse_tags(value) -> dict:
@@ -139,6 +156,7 @@ def silver(df_bronze: pd.DataFrame) -> pd.DataFrame:
             "tag_environment": tags.map(lambda t: t.get("environment") or t.get("env")),
             "tag_cost_center": tags.map(lambda t: t.get("costcenter") or t.get("cost-center") or t.get("cost_center")),
             "tag_project": tags.map(lambda t: t.get("project") or t.get("application") or t.get("app")),
+            "_export_path": df["_export_path"],
             "_billing_period": df["_billing_period"],
             "_export_run": df["_export_run"],
             "_source_file": df["_source_file"],
@@ -147,6 +165,11 @@ def silver(df_bronze: pd.DataFrame) -> pd.DataFrame:
     out = out[out["charge_date"].notna() & out["effective_cost"].notna()]
     # No row-level dedup: identical FOCUS line items are legitimate; duplicates come only from old export runs.
     print(f"  silver_costs: {len(out)} rows")
+    print("\n  effective cost by subscription (silver):")
+    print(
+        out.groupby("subscription_name")["effective_cost"].sum().sort_values(ascending=False).round(2)
+        .to_string().replace("\n", "\n    ")
+    )
     print("\n  effective cost by service (silver):")
     print(
         out.groupby("service_name")["effective_cost"].sum().sort_values(ascending=False).round(2)
@@ -160,11 +183,12 @@ def silver(df_bronze: pd.DataFrame) -> pd.DataFrame:
 def gold(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     banner("GOLD    - star schema for Power BI (Direct Lake)")
     df = df.copy()
-    df["resource_key"] = df["resource_id"].fillna(UNASSIGNED)
+    df["subscription_id"] = df["subscription_id"].fillna("unknown")
+    df["resource_key"] = df["resource_id"].fillna(UNASSIGNED + "/" + df["subscription_id"])
 
     fact = (
         df.groupby(
-            ["charge_date", "resource_key", "service_name", "meter_category", "charge_category",
+            ["charge_date", "subscription_id", "resource_key", "service_name", "meter_category", "charge_category",
              "pricing_category", "billing_currency"],
             dropna=False, as_index=False,
         )
@@ -180,6 +204,15 @@ def gold(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     for c in ("billed_cost", "effective_cost", "list_cost", "savings"):
         fact[c] = fact[c].round(4)
 
+    dim_subscription = (
+        df.sort_values("charge_date", ascending=False)
+        .drop_duplicates("subscription_id")
+        [["subscription_id", "subscription_name", "billing_account_name"]]
+        .reset_index(drop=True)
+    )
+    dim_subscription["subscription_name"] = dim_subscription["subscription_name"].fillna(dim_subscription["subscription_id"])
+    dim_subscription["billing_account_name"] = dim_subscription["billing_account_name"].fillna("(not set)")
+
     dim_resource = (
         df.sort_values("charge_date", ascending=False)
         .drop_duplicates("resource_key")
@@ -187,7 +220,7 @@ def gold(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
           "subscription_id", "subscription_name", "region", "tag_environment", "tag_cost_center", "tag_project", "tags"]]
         .reset_index(drop=True)
     )
-    dim_resource.loc[dim_resource["resource_key"] == UNASSIGNED, ["resource_name", "resource_group"]] = \
+    dim_resource.loc[dim_resource["resource_key"].str.startswith(UNASSIGNED), ["resource_name", "resource_group"]] = \
         ["(no resource)", "(no resource group)"]
     for c in ("resource_name", "resource_group", "tag_environment", "tag_cost_center", "tag_project"):
         dim_resource[c] = dim_resource[c].fillna("(not set)")
@@ -219,24 +252,25 @@ def gold(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     monthly = (
         df.assign(year_month=pd.to_datetime(df["charge_date"]).dt.strftime("%Y-%m"))
-        .groupby(["year_month", "service_name"], as_index=False)
+        .groupby(["year_month", "subscription_id", "service_name"], as_index=False)
         .agg(effective_cost=("effective_cost", "sum"), list_cost=("list_cost", "sum"))
-        .sort_values(["service_name", "year_month"])
     )
     monthly["cost_year"] = monthly["year_month"].str[:4].astype(int)
+    keys = ["year_month", "subscription_id", "service_name"]
     # Previous month is matched by calendar month (not row order), so gaps yield an empty value.
-    previous = monthly[["year_month", "service_name", "effective_cost"]].rename(columns={"effective_cost": "previous_month_cost"})
+    previous = monthly[keys + ["effective_cost"]].rename(columns={"effective_cost": "previous_month_cost"})
     previous["year_month"] = (pd.to_datetime(previous["year_month"] + "-01") + pd.DateOffset(months=1)).dt.strftime("%Y-%m")
-    monthly = monthly.merge(previous, on=["year_month", "service_name"], how="left").sort_values(["service_name", "year_month"])
+    monthly = monthly.merge(previous, on=keys, how="left").sort_values(["subscription_id", "service_name", "year_month"])
     monthly["mom_change"] = monthly["effective_cost"] - monthly["previous_month_cost"]
     monthly["mom_change_pct"] = monthly["mom_change"] / monthly["previous_month_cost"]
-    monthly["ytd_cost"] = monthly.groupby(["service_name", "cost_year"])["effective_cost"].cumsum()
+    monthly["ytd_cost"] = monthly.groupby(["subscription_id", "service_name", "cost_year"])["effective_cost"].cumsum()
     for c in ("effective_cost", "list_cost", "previous_month_cost", "mom_change", "ytd_cost"):
         monthly[c] = monthly[c].round(4)
     monthly["mom_change_pct"] = monthly["mom_change_pct"].round(4)
 
     tables = {
         "gold_fact_cost_daily": fact,
+        "gold_dim_subscription": dim_subscription,
         "gold_dim_resource": dim_resource,
         "gold_dim_service": dim_service,
         "gold_dim_date": dim_date,

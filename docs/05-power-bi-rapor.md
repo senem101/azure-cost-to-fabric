@@ -7,8 +7,10 @@
 ```mermaid
 erDiagram
     Date ||--o{ Cost : "Date = charge_date"
+    Subscription ||--o{ Cost : "Subscription Id = subscription_id"
     Resource ||--o{ Cost : "resource_key"
     Service ||--o{ Cost : "Service = service_name"
+    Subscription ||--o{ "Monthly Summary" : "Subscription Id = subscription_id"
     Service ||--o{ "Monthly Summary" : "Service = service_name"
 ```
 
@@ -16,7 +18,8 @@ erDiagram
 |---|---|---|
 | **Cost** | `gold_fact_cost_daily` | Fact; tüm ölçüler burada |
 | **Date** | `gold_dim_date` | *Mark as date table* yapılmış takvim |
-| **Resource** | `gold_dim_resource` | Kaynak, RG, abonelik, bölge, etiketler |
+| **Subscription** | `gold_dim_subscription` | Abonelik adı/ID'si ve fatura hesabı. Çoklu abonelikte ana filtre |
+| **Resource** | `gold_dim_resource` | Kaynak, RG, bölge, etiketler |
 | **Service** | `gold_dim_service` | Servis ve kategori |
 | **Monthly Summary** | `gold_cost_monthly` | Önceden hesaplanmış aylık MoM/YTD (DAX'sız hızlı tablo) |
 
@@ -32,7 +35,8 @@ erDiagram
 | Effective Cost PM | `CALCULATE([Effective Cost], DATEADD('Date'[Date], -1, MONTH))` | Önceki ay |
 | MoM Change / MoM Change % | `[Effective Cost] - [Effective Cost PM]` | Aylık değişim |
 | Avg Daily Cost | `AVERAGEX(VALUES('Date'[Date]), [Effective Cost])` | Günlük ortalama (boş günler hariç) |
-| Resource Count | `DISTINCTCOUNT` (unassigned hariç) | Maliyet üreten kaynak sayısı |
+| Resource Count | `DISTINCTCOUNT` (`unassigned/…` hariç) | Maliyet üreten kaynak sayısı |
+| Subscription Count | `DISTINCTCOUNT('Cost'[subscription_id])` | Maliyet üreten abonelik sayısı |
 | Line Items | `SUM('Cost'[line_items])` | Kaynak satır sayısı |
 
 ## 5.2 Raporu oluşturma (adım adım)
@@ -47,8 +51,8 @@ erDiagram
 | 1 | **Card** ×4 | `Effective Cost MTD`, `Effective Cost PM`, `MoM Change %`, `Savings` |
 | 2 | **Stacked area / column chart** — Günlük trend | X: `Date[Date]`, Y: `Effective Cost`, Legend: `Service[Service Category]` |
 | 3 | **Bar chart** — Servise göre | Y: `Service[Service]`, X: `Effective Cost` (azalan sırala) |
-| 4 | **Donut** — Resource group | Legend: `Resource[Resource Group]`, Values: `Effective Cost` |
-| 5 | **Slicer**'lar | `Date[Year Month]`, `Resource[Subscription]`, `Resource[Environment (tag)]` |
+| 4 | **Donut** ×2 | Legend: `Subscription[Subscription]` ve `Resource[Resource Group]`, Values: `Effective Cost` |
+| 5 | **Slicer**'lar | `Date[Year Month]`, `Subscription[Subscription]`, `Resource[Environment (tag)]` |
 
 ### Sayfa 2 — Kaynak detayı
 
@@ -63,7 +67,7 @@ erDiagram
 | # | Görsel | Alanlar |
 |---|---|---|
 | 1 | **Clustered column** | X: `Date[Year Month]`, Y: `Effective Cost`, Legend: `Service[Service]` |
-| 2 | **Table** — Aylık özet | `Monthly Summary` tablosundaki tüm kolonlar |
+| 2 | **Table** — Aylık özet | `Monthly Summary` tablosundaki kolonlar (abonelik × servis; `Subscription[Subscription]` ile birlikte) |
 | 3 | **Line and clustered column** | X: `Date[Year Month]`, Columns: `List Cost`, `Effective Cost`; Line: `Savings %` |
 | 4 | **Bar** | Y: `Cost[Pricing Category]`, X: `Effective Cost` (PAYG vs Reservation/Savings Plan) |
 
@@ -81,10 +85,11 @@ erDiagram
 Fabric'te **SQL analytics endpoint** üzerinden mutabakat:
 
 ```sql
-SELECT FORMAT(charge_date,'yyyy-MM') AS ay, SUM(effective_cost) AS effective_cost
-FROM dbo.gold_fact_cost_daily
-GROUP BY FORMAT(charge_date,'yyyy-MM')
-ORDER BY ay;
+SELECT FORMAT(f.charge_date,'yyyy-MM') AS ay, s.subscription_name, SUM(f.effective_cost) AS effective_cost
+FROM dbo.gold_fact_cost_daily f
+JOIN dbo.gold_dim_subscription s ON s.subscription_id = f.subscription_id
+GROUP BY FORMAT(f.charge_date,'yyyy-MM'), s.subscription_name
+ORDER BY ay, s.subscription_name;
 ```
 
-Sonuçları Azure portal → **Cost Management → Cost analysis** (View: *Amortized cost*, Granularity: *Monthly*) ile karşılaştırın. Küçük farklar normaldir: portal son 72 saati henüz kesinleşmemiş verilerle gösterir, export ise bir sonraki çalışmasında günceller.
+Sonuçları Azure portal → **Cost Management → Cost analysis** (View: *Amortized cost*, Granularity: *Monthly*, Scope: ilgili abonelik veya management group) ile karşılaştırın. Küçük farklar normaldir: portal son 72 saati henüz kesinleşmemiş verilerle gösterir, export ise bir sonraki çalışmasında günceller.

@@ -24,18 +24,20 @@ if (-not (Test-Path .venv)) { python -m venv .venv }
 $py = Resolve-Path .\.venv\Scripts\python.exe
 
 Step 1 'Azure Cost Management export (simulasyon)' @'
-Gercekte Azure her gun FOCUS 1.0 formatinda Parquet dosyalarini storage'a yazar:
-  costs/focus/<export>/<yyyyMMdd-yyyyMMdd>/<run-id>/part_0_0001.parquet
-Burada ayni klasor yapisini ornek veriyle uretiyoruz (3 tam ay + bu ay, bu ay icin 2 run).
+Gercekte Azure her gun FOCUS 1.0 formatinda Parquet dosyalarini storage'a yazar.
+Her abonelik icin ayri bir export vardir ve hepsi ayni container'a, kendi klasorune yazar:
+  costs/focus/<abonelik-id>/<export>/<yyyyMMdd-yyyyMMdd>/<run-id>/part_0_0001.parquet
+Burada ayni yapiyi 3 abonelik icin ornek veriyle uretiyoruz
+(contoso-prod, contoso-platform, contoso-dev; 3 tam ay + bu ay, bu ay icin 2 run).
 '@
 Remove-Item -Recurse -Force sample-data, output -ErrorAction SilentlyContinue
 & $py generate_sample_focus.py --months 3
 
 Step 2 'Bronze -> Silver -> Gold (Fabric notebooklarinin yerel karsiligi)' @'
 Bronze : dosyalar degistirilmeden okunur, lineage kolonlari eklenir.
-Silver : her fatura donemi icin EN GUNCEL export run'i tutulur (cift sayim engellenir),
+Silver : her (abonelik export'u, fatura donemi) icin EN GUNCEL run tutulur (cift sayim engellenir),
          FOCUS kolonlari sabit bir sozlesmeye cevrilir, etiketler ayristirilir.
-Gold   : Power BI icin yildiz sema (fact + date/resource/service boyutlari + aylik ozet).
+Gold   : Power BI icin yildiz sema (fact + tarih/abonelik/kaynak/servis boyutlari + aylik ozet).
 '@
 & $py run_local_pipeline.py
 

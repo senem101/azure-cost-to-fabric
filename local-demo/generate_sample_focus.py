@@ -1,13 +1,14 @@
 """Generate synthetic Azure Cost Management FOCUS 1.0 exports for the offline demo.
 
-The output mirrors the folder layout a real Cost Management export writes to
-ADLS Gen2, so the same Bronze logic can read it:
+The output mirrors the folder layout of one Cost Management export per subscription,
+all writing to the same ADLS Gen2 container, so the same Bronze logic can read it:
 
-    <out>/costs/focus/<export-name>/<yyyyMMdd-yyyyMMdd>/<run-id>/part_0_0001.parquet
-                                                              /manifest.json
+    <out>/costs/focus/<subscription-id>/<export-name>/<yyyyMMdd-yyyyMMdd>/<run-id>/part_0_0001.parquet
+                                                                                 /manifest.json
 
-The current month is written twice (an older and a newer run) to demonstrate
-why Silver keeps only the latest export run per billing period.
+Three subscriptions are generated. The current month is written twice (an older and
+a newer run) per subscription to demonstrate why Silver keeps only the latest run
+per export folder and billing period.
 
 Usage:
     python generate_sample_focus.py --out ./sample-data --months 3
@@ -22,14 +23,23 @@ import random
 import time
 import uuid
 import zlib
+from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
 
 EXPORT_NAME = "focus-daily-demo"
-SUBSCRIPTION_ID = "11111111-2222-3333-4444-555555555555"
-SUBSCRIPTION_NAME = "contoso-prod"
+SUBSCRIPTIONS = {
+    "prod": ("11111111-2222-3333-4444-555555555555", "contoso-prod"),
+    "platform": ("22222222-3333-4444-5555-666666666666", "contoso-platform"),
+    "dev": ("33333333-4444-5555-6666-777777777777", "contoso-dev"),
+}
+RG_SUBSCRIPTION = {
+    "rg-agent-prod": "prod", "rg-ai-prod": "prod", "rg-web-prod": "prod",
+    "rg-data-prod": "platform", "rg-shared": "platform",
+    "rg-dev": "dev",
+}
 BILLING_ACCOUNT_ID = "/providers/Microsoft.Billing/billingAccounts/demo-ba"
 BILLING_ACCOUNT_NAME = "Contoso Ltd."
 CURRENCY = "USD"
@@ -109,8 +119,9 @@ def build_rows(day: date, rng: random.Random, growth: float) -> list[dict]:
         effective = round(list_cost * (1 - discount), 6)
         # Committed usage is billed through the reservation purchase, not the usage row.
         billed = 0.0 if pricing == "Committed" else effective
+        sub_id, sub_name = SUBSCRIPTIONS[RG_SUBSCRIPTION[rg]]
         resource_id = (
-            f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{rg}/providers/{rtype}/{name}"
+            f"/subscriptions/{sub_id}/resourceGroups/{rg}/providers/{rtype}/{name}"
         )
         rows.append(
             {
@@ -144,8 +155,8 @@ def build_rows(day: date, rng: random.Random, growth: float) -> list[dict]:
                 "ServiceCategory": category,
                 "ServiceName": service,
                 "SkuId": f"SKU-{zlib.crc32(meter.encode()) % 10_000:04d}",
-                "SubAccountId": f"/subscriptions/{SUBSCRIPTION_ID}",
-                "SubAccountName": SUBSCRIPTION_NAME,
+                "SubAccountId": f"/subscriptions/{sub_id}",
+                "SubAccountName": sub_name,
                 "SubAccountType": "Subscription",
                 "Tags": json.dumps(tags) if tags else None,
                 "x_ResourceGroupName": rg,
@@ -156,11 +167,12 @@ def build_rows(day: date, rng: random.Random, growth: float) -> list[dict]:
         )
 
     if day.day == 1:
-        # Monthly reservation purchase and a support plan: no resource attached.
-        for desc, svc, cat, cost in (
-            ("Reserved VM Instance, D4s v5, 1 Year", "Virtual Machines", "Compute", 210.0),
-            ("Azure Support - Standard", "Azure Support", "Other", 100.0),
+        # Monthly reservation purchase (prod) and a support plan (platform): no resource attached.
+        for desc, svc, cat, cost, sub_key in (
+            ("Reserved VM Instance, D4s v5, 1 Year", "Virtual Machines", "Compute", 210.0, "prod"),
+            ("Azure Support - Standard", "Azure Support", "Other", 100.0, "platform"),
         ):
+            sub_id, sub_name = SUBSCRIPTIONS[sub_key]
             rows.append(
                 {
                     "BilledCost": cost, "BillingAccountId": BILLING_ACCOUNT_ID,
@@ -176,8 +188,8 @@ def build_rows(day: date, rng: random.Random, growth: float) -> list[dict]:
                     "ProviderName": "Microsoft", "PublisherName": "Microsoft", "RegionId": None,
                     "RegionName": None, "ResourceId": None, "ResourceName": None, "ResourceType": None,
                     "ServiceCategory": cat, "ServiceName": svc, "SkuId": None,
-                    "SubAccountId": f"/subscriptions/{SUBSCRIPTION_ID}",
-                    "SubAccountName": SUBSCRIPTION_NAME, "SubAccountType": "Subscription", "Tags": None,
+                    "SubAccountId": f"/subscriptions/{sub_id}",
+                    "SubAccountName": sub_name, "SubAccountType": "Subscription", "Tags": None,
                     "x_ResourceGroupName": None, "x_ResourceType": None,
                     "x_SkuMeterCategory": None, "x_SkuMeterName": None,
                 }
@@ -185,11 +197,11 @@ def build_rows(day: date, rng: random.Random, growth: float) -> list[dict]:
     return rows
 
 
-def write_run(root: Path, period_start: date, rows: list[dict], mtime: float) -> Path:
+def write_run(root: Path, subscription_id: str, period_start: date, rows: list[dict], mtime: float) -> Path:
     period_end = next_month(period_start) - timedelta(days=1)
     period_folder = f"{period_start:%Y%m%d}-{period_end:%Y%m%d}"
     run_id = str(uuid.uuid4())
-    run_dir = root / "costs" / "focus" / EXPORT_NAME / period_folder / run_id
+    run_dir = root / "costs" / "focus" / subscription_id / EXPORT_NAME / period_folder / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
     part = run_dir / "part_0_0001.parquet"
@@ -232,17 +244,21 @@ def main() -> None:
             day += timedelta(days=1)
 
         is_current = period == month_start(end)
-        if is_current:
-            # An older, partial run of the current month that Silver must ignore.
-            older = [r for r in rows if r["ChargePeriodStart"].date() < last_day] or rows[: len(rows) // 2]
-            p = write_run(root, period, older, now - 86_400)
-            print(f"  older run  {p.relative_to(root)}  ({len(older)} rows)")
-        p = write_run(root, period, rows, now - (0 if is_current else 3600))
-        print(f"  latest run {p.relative_to(root)}  ({len(rows)} rows)")
+        by_subscription: dict[str, list[dict]] = defaultdict(list)
+        for r in rows:
+            by_subscription[r["SubAccountId"].split("/")[-1]].append(r)
+        for sub_id, sub_rows in by_subscription.items():
+            if is_current:
+                # An older, partial run of the current month that Silver must ignore.
+                older = [r for r in sub_rows if r["ChargePeriodStart"].date() < last_day] or sub_rows[: max(1, len(sub_rows) // 2)]
+                p = write_run(root, sub_id, period, older, now - 86_400)
+                print(f"  older run  {p.relative_to(root)}  ({len(older)} rows)")
+            p = write_run(root, sub_id, period, sub_rows, now - (0 if is_current else 3600))
+            print(f"  latest run {p.relative_to(root)}  ({len(sub_rows)} rows)")
         total_rows += len(rows)
         period = next_month(period)
 
-    print(f"\nSample FOCUS export written to {root.resolve()} ({total_rows} current rows).")
+    print(f"\nSample FOCUS exports for {len(SUBSCRIPTIONS)} subscriptions written to {root.resolve()} ({total_rows} current rows).")
 
 
 if __name__ == "__main__":

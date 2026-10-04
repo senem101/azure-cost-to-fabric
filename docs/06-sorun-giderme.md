@@ -12,13 +12,31 @@ FOCUS export'u EA, MCA ve Pay-as-you-go abonelikleri destekler. Bazı **Sponsors
 `exportStartDate` parametresi geçmiş bir tarihe ayarlanmış. Parametreyi boş bırakın (varsayılan: bugün → ilk çalışma yarın).
 
 ### Export çalıştı ama dosya yok
-- `runHistory` içinde `status` alanına bakın: `az rest --method get --url "<COST_EXPORT_ID>?api-version=2025-03-01&$expand=runHistory"`.
+- `runHistory` içinde `status` alanına bakın: `az rest --method get --url "<COST_EXPORT_IDS içindeki ID>?api-version=2025-03-01&$expand=runHistory"`.
 - **Yeni abonelik:** Maliyet verisi ilk 24–48 saat oluşmayabilir; boş ay için dosya yazılmaz.
 - Storage'da `allowSharedKeyAccess: false` yapılmışsa export yazamaz (bkz. [Mimari → Güvenlik](01-mimari.md#güvenlik-modeli)).
 - Storage firewall'u "Selected networks" ise *Allow trusted Microsoft services* işaretli olmalı.
 
 ### `az storage fs file list` → `AuthorizationPermissionMismatch`
 Rol ataması yayılıyor (~5 dk). Bekleyip tekrar deneyin.
+
+## Çoklu abonelik
+
+### `WARNING: Skipping subscriptions that are not enabled in tenant ...`
+Export'lar başka tenant'taki storage'a yazamaz; script bu abonelikleri atlar. Diğer tenant için `az login --tenant <id>` ile ayrı bir ortam kurun ([2.8](02-azure-cost-export.md#28-birden-fazla-abonelik)).
+
+### Deployment bir abonelikte `AuthorizationFailed` ile duruyor
+Bicep tüm export'ları tek deployment'ta oluşturur; bir abonelikte yetki yoksa hepsi başarısız olur. Yetkili olduğunuz abonelikleri `-ExportSubscriptionIds` ile açıkça verin veya ilgili abonelikte *Cost Management Contributor* rolü isteyin.
+
+### `-BillingScope` → `401/403` veya `RBACAccessDenied`
+Fatura hesabı kapsamı Azure RBAC değil, **billing** rolleri ister: EA'da *Enterprise Administrator*, MCA'da *Billing profile owner/contributor*. Yetkiniz yoksa abonelik bazlı seçenekleri kullanın.
+
+### Raporda bazı abonelikler eksik
+- `az storage fs directory list -f costs --path focus --account-name <storage> --auth-mode login -o table` ile her aboneliğin klasörünü kontrol edin.
+- Yeni eklenen aboneliğin export'u ertesi gün çalışır; hemen veri için `02-run-cost-export.ps1`'i tekrar çalıştırın.
+
+### Toplam maliyet beklenenin 2 katı (çoklu abonelik)
+Hem abonelik export'ları hem `-BillingScope` export'u aynı storage'a yazıyor olabilir. `focus/billing/` ile `focus/<abonelikId>/` klasörlerinden yalnızca birini tutun.
 
 ## Fabric tarafı
 
@@ -42,7 +60,7 @@ Workspace identity'nin rolü henüz yayılmadı. Script 15 kez × 30 sn tekrar d
 Notebook'un **varsayılan lakehouse**'u bağlı değil. Notebook → sol panel → *Lakehouses* → `CostLakehouse` → **Set as default**. (Script bunu otomatik yapar; elle import edilen notebook'larda gerekir.)
 
 ### Silver: toplam maliyet portaldakinin 2–3 katı
-Eski run'lar elenmiyor demektir. `_source_file` yolunun `/<yyyyMMdd-yyyyMMdd>/<runId>/` desenine uyduğunu kontrol edin:
+Eski run'lar elenmiyor demektir. `_source_file` yolunun `.../<export>/<yyyyMMdd-yyyyMMdd>/<runId>/` desenine uyduğunu kontrol edin:
 ```python
 spark.read.table("bronze_costs").select("_source_file").distinct().show(truncate=False)
 ```

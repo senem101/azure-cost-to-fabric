@@ -2,7 +2,7 @@
 
 ## Amaç
 
-Azure aboneliğindeki **tüm servislerin** (VM, SQL, OpenAI, Storage, AKS, …) maliyetini:
+Azure aboneliklerindeki (tek, birden fazla veya tüm fatura hesabı) **tüm servislerin** (VM, SQL, OpenAI, Storage, AKS, …) maliyetini:
 
 1. her gün otomatik olarak toplamak,
 2. tek bir standart şemaya (FOCUS) oturtmak,
@@ -21,12 +21,12 @@ sequenceDiagram
     participant SM as Semantic model
     participant PBI as Power BI
 
-    CM->>ST: Günlük FOCUS export (Parquet + manifest.json)
-    Note over ST: costs/focus/<export>/<dönem>/<runId>/part_*.parquet
+    CM->>ST: Abonelik başına günlük FOCUS export (Parquet + manifest.json)
+    Note over ST: costs/focus/<abonelikId>/<export>/<dönem>/<runId>/part_*.parquet
     LH->>ST: Shortcut Files/costs (workspace identity, kopyalama yok)
-    NB->>LH: 01 Bronze: ham dosyaları oku → bronze_costs
-    NB->>LH: 02 Silver: en güncel run + tipleme → silver_costs
-    NB->>LH: 03 Gold: yıldız şema → gold_* tabloları
+    NB->>LH: 01 Bronze: tüm export'ların ham dosyalarını oku → bronze_costs
+    NB->>LH: 02 Silver: export+dönem başına en güncel run + tipleme → silver_costs
+    NB->>LH: 03 Gold: yıldız şema (abonelik boyutu dahil) → gold_* tabloları
     SM->>LH: Direct Lake (Delta dosyalarını doğrudan okur)
     PBI->>SM: DAX sorguları
 ```
@@ -37,6 +37,7 @@ sequenceDiagram
 |---|---|
 | **Cost Management Export** (API sorgusu yerine) | Ücretsiz, zamanlanmış, büyük hacimde güvenilir; Query API'nin rate-limit ve sayfalama sorunları yok |
 | **FOCUS 1.0** veri seti | FinOps Foundation'ın açık standardı. Actual + amortized maliyeti, liste fiyatını ve rezervasyon/savings plan indirimlerini tek tabloda verir. İleride AWS/GCP verisiyle birleştirmek kolaylaşır |
+| **Abonelik başına export, tek storage** | Tüm anlaşma türlerinde çalışır; her export `focus/<abonelikId>/` altına yazdığı için çakışmaz. EA/MCA'da alternatif olarak fatura hesabı kapsamında tek export kullanılabilir ([2.8](02-azure-cost-export.md#28-birden-fazla-abonelik)) |
 | **Parquet + snappy** | CSV'ye göre ~10 kat küçük, tip bilgisi korunur, Spark'ta hızlı okunur |
 | **ADLS Gen2 (HNS açık)** | OneLake shortcut'ı için hiyerarşik namespace gerekir |
 | **OneLake shortcut** | Veriyi kopyalamadan Fabric'ten erişilir; tek kopya, tek gerçek |
@@ -56,7 +57,7 @@ FOCUS (FinOps Open Cost and Usage Specification), bulut sağlayıcıları arası
 | `ListCost` | İndirimsiz liste fiyatı → tasarruf hesabı için | `list_cost` |
 | `ServiceName` / `ServiceCategory` | "Virtual Machines" / "Compute" gibi servis bilgisi | `service_name` / `service_category` |
 | `ResourceId`, `ResourceName`, `x_ResourceGroupName` | Kaynak bilgisi | `resource_*` |
-| `SubAccountId` / `SubAccountName` | Abonelik | `subscription_*` |
+| `SubAccountId` / `SubAccountName` | Abonelik | `subscription_id` / `subscription_name` → `Subscription` boyutu |
 | `ChargeCategory` | `Usage`, `Purchase`, `Tax`, `Credit`, `Adjustment` | `charge_category` |
 | `PricingCategory` | `Standard` (PAYG), `Committed` (RI/SP), `Dynamic` (Spot) | `pricing_category` |
 | `Tags` | JSON etiketler | `tags` + `tag_environment`, `tag_cost_center`, `tag_project` |

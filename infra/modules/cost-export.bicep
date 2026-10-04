@@ -4,6 +4,9 @@ targetScope = 'subscription'
 param exportName string
 param storageAccountId string
 
+@description('Folder inside the "costs" container. One folder per export keeps subscriptions apart.')
+param rootFolderPath string = 'focus/${subscription().subscriptionId}'
+
 @description('First scheduled run (ISO 8601). Must be in the future.')
 param scheduleStart string
 
@@ -26,7 +29,7 @@ resource costExport 'Microsoft.CostManagement/exports@2025-03-01' = {
         type: 'AzureBlob'
         resourceId: storageAccountId
         container: 'costs'
-        rootFolderPath: 'focus'
+        rootFolderPath: rootFolderPath
       }
     }
     format: 'Parquet'

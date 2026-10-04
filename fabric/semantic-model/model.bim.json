@@ -99,7 +99,7 @@
             "formatString": "#,0.00"
           },
           {
-            "name": "savings",
+            "name": "Savings Amount",
             "dataType": "decimal",
             "sourceColumn": "savings",
             "lineageTag": "27f697f3-9c6b-51dc-bf5a-de6a28d9cd96",
@@ -196,7 +196,7 @@
           },
           {
             "name": "MoM Change",
-            "expression": "IF ( NOT ISBLANK ( [Effective Cost PM] ), [Effective Cost] - [Effective Cost PM] )",
+            "expression": "IF ( NOT ISBLANK ( [Effective Cost] ) && NOT ISBLANK ( [Effective Cost PM] ), [Effective Cost] - [Effective Cost PM] )",
             "formatString": "#,0.00",
             "lineageTag": "cc1467b3-0b61-5941-8ac9-4e22185d459f",
             "displayFolder": "Time intelligence"

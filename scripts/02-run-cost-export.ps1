@@ -11,11 +11,14 @@
 
 .EXAMPLE
   ./scripts/02-run-cost-export.ps1 -BackfillMonths 3
+  ./scripts/02-run-cost-export.ps1 -WaitOnly -SinceMinutes 30   # only wait for runs triggered in the last 30 minutes
 #>
 [CmdletBinding()]
 param(
     [int] $BackfillMonths = 0,
-    [int] $WaitMinutes = 30
+    [int] $WaitMinutes = 30,
+    [switch] $WaitOnly,
+    [int] $SinceMinutes = 60
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path $PSScriptRoot -Parent
@@ -52,9 +55,24 @@ function Invoke-ExportRun([string] $exportId, $from, $to) {
     }
 }
 
-Write-Host "`n=== Trigger $($exportIds.Count) export(s) '$($o.COST_EXPORT_NAME)' ===" -ForegroundColor Cyan
-$started = (Get-Date).ToUniversalTime()
+function Get-RunHistory([string] $exportId) {
+    # Query parameters go through --uri-parameters: a literal '&' in --url is split by az.cmd on Windows.
+    $runs = az rest --method get --url "https://management.azure.com$exportId" `
+        --uri-parameters "api-version=$api" '$expand=runHistory' `
+        --query 'properties.runHistory.value[].properties' -o json | ConvertFrom-Json
+    return @($runs | Where-Object { $_.submittedTime })
+}
+
 $expected = @{}
+if ($WaitOnly) {
+    $started = (Get-Date).ToUniversalTime().AddMinutes(-$SinceMinutes)
+    foreach ($id in $exportIds) {
+        $expected[$id] = @(Get-RunHistory $id | Where-Object { ([datetime]$_.submittedTime).ToUniversalTime() -ge $started }).Count
+    }
+    Write-Host "`n=== Waiting for runs submitted in the last $SinceMinutes minutes ===" -ForegroundColor Cyan
+} else {
+Write-Host "`n=== Trigger $($exportIds.Count) export(s) '$($o.COST_EXPORT_NAME)' ===" -ForegroundColor Cyan
+$started = (Get-Date).ToUniversalTime().AddMinutes(-1)
 $firstOfMonth = Get-Date -Day 1 -Hour 0 -Minute 0 -Second 0
 foreach ($id in $exportIds) {
     $expected[$id] = 0
@@ -65,6 +83,7 @@ foreach ($id in $exportIds) {
         if (Invoke-ExportRun $id $from $from.AddMonths(1).AddDays(-1)) { $expected[$id]++ }
     }
 }
+}
 
 Write-Host "`n=== Wait for the runs to finish (usually 2-10 minutes per export) ===" -ForegroundColor Cyan
 $deadline = (Get-Date).AddMinutes($WaitMinutes)
@@ -74,9 +93,8 @@ do {
     $pending = 0
     $failed = @()
     $line = foreach ($id in $exportIds) {
-        $history = az rest --method get --url "https://management.azure.com$id`?api-version=$api&`$expand=runHistory" `
-            --query 'properties.runHistory.value[].properties' -o json | ConvertFrom-Json
-        $recent = @($history | Where-Object { [datetime]$_.submittedTime -ge $started.AddMinutes(-1) })
+        $history = Get-RunHistory $id
+        $recent = @($history | Where-Object { ([datetime]$_.submittedTime).ToUniversalTime() -ge $started })
         $done = @($recent | Where-Object { $_.status -in 'Completed', 'Failed' }).Count
         $failed += @($recent | Where-Object status -eq 'Failed')
         if ($done -lt $expected[$id]) { $pending++ }
@@ -89,9 +107,12 @@ $failed | ForEach-Object { Write-Warning "Run failed: $($_.error.message)" }
 if ($pending -gt 0) { Write-Warning "$pending export(s) still running; check Cost Management > Exports > Run history." }
 
 Write-Host "`n=== Files in container 'costs' ===" -ForegroundColor Cyan
-az storage fs file list --account-name $o.AZURE_STORAGE_ACCOUNT_NAME --file-system costs --auth-mode login `
-    --query "[?ends_with(name, '.parquet')].{file:name, sizeKB:to_string(floor(contentLength/``1024``))}" -o table
+$files = az storage fs file list --account-name $o.AZURE_STORAGE_ACCOUNT_NAME --file-system costs --auth-mode login `
+    --query "[?ends_with(name, '.parquet')].{name:name, size:contentLength}" -o json | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0) {
     Write-Warning 'Listing failed. New role assignments can take ~5 minutes to apply; retry, or check the container in the portal.'
+} else {
+    $files | ForEach-Object { '{0,8:N1} KB  {1}' -f ($_.size / 1KB), $_.name } | Write-Host
+    Write-Host "  $(@($files).Count) parquet file(s)"
 }
 Write-Host "`nNext: python ./scripts/setup_fabric.py --capacity-name <your-capacity>" -ForegroundColor Green

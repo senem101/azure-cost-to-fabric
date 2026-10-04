@@ -12,7 +12,8 @@ FOCUS export'u EA, MCA ve Pay-as-you-go abonelikleri destekler. Bazı **Sponsors
 `exportStartDate` parametresi geçmiş bir tarihe ayarlanmış. Parametreyi boş bırakın (varsayılan: bugün → ilk çalışma yarın).
 
 ### Export çalıştı ama dosya yok
-- `runHistory` içinde `status` alanına bakın: `az rest --method get --url "<COST_EXPORT_IDS içindeki ID>?api-version=2025-03-01&$expand=runHistory"`.
+- `runHistory` içinde `status` alanına bakın: `az rest --method get --url "https://management.azure.com<COST_EXPORT_IDS içindeki ID>" --uri-parameters "api-version=2025-03-01" '$expand=runHistory' --query "properties.runHistory.value[].properties" -o table`. (Windows'ta URL'ye `&` yazmayın; `az.cmd` bunu komut ayırıcı sayar.)
+- Çalıştırmalar uzun süre **Queued** kalabilir (yoğun saatlerde 30+ dk). Beklemeye devam etmek için: `./scripts/02-run-cost-export.ps1 -WaitOnly -SinceMinutes 60`.
 - **Yeni abonelik:** Maliyet verisi ilk 24–48 saat oluşmayabilir; boş ay için dosya yazılmaz.
 - Export'un managed identity'sinin storage'da rolü olmalı: `az role assignment list --assignee <export identity.principalId> --all -o table` → `costs` container'ında *Storage Blob Data Contributor*. Yoksa export'u portaldan açıp **Save** edin (rol yeniden atanır) veya rolü elle verin.
 - Storage firewall'u "Selected networks" ise *Allow trusted Microsoft services* işaretli olmalı.

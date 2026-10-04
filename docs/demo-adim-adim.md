@@ -77,7 +77,7 @@ GOLD    gold_fact_cost_daily 1121 · gold_dim_subscription 3 · gold_dim_resourc
 
 | # | Komut / işlem | Gösterilecek |
 |---|---|---|
-| 1 | `./scripts/01-deploy-azure.ps1 -EnvironmentName demo` (çoklu abonelik: `-ExportSubscriptionIds <id1>,<id2>` veya `-AllSubscriptions`) | Portal → RG `rg-costfabric-demo` → storage; her abonelikte Cost Management → **Exports** → `focus-daily-demo` |
+| 1 | `./scripts/01-deploy-azure.ps1 -EnvironmentName demo` (çoklu abonelik: `-ExportSubscriptionIds <id1>,<id2>` veya `-AllSubscriptions`) | Portal → RG `rg-costfabric-demo` → storage; her abonelikte Cost Management → **Exports** → `focus-daily-demo`. Tam liste: [2.6 Portaldan kontrol listesi](02-azure-cost-export.md#portaldan-kontrol-listesi-adım-1-sonrası) |
 | 2 | `./scripts/02-run-cost-export.ps1 -BackfillMonths 2` | Run history'de *Completed*; storage → `costs/focus/<abonelikId>/...` klasör yapısı |
 | 3 | Fabric kapasitesini **Resume** | Portal → Fabric capacity → *Active* |
 | 4 | `python scripts/setup_fabric.py --capacity-name <kapasite> --schedule-time 06:00` | Konsoldaki 8 adım; workspace'in açılması |

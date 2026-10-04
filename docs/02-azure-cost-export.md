@@ -109,12 +109,28 @@ az storage fs file list --account-name $o.AZURE_STORAGE_ACCOUNT_NAME -f costs --
 
 Hiç dosya yoksa: [06-sorun-giderme.md](06-sorun-giderme.md#export-çalıştı-ama-dosya-yok).
 
+### Portaldan kontrol listesi (Adım 1 sonrası)
+
+| # | Nerede | Beklenen |
+|---|---|---|
+| 1 | Resource groups → `rg-costfabric-<env>` | Storage account `stcost...` |
+| 2 | Storage → *Configuration* | **Allow storage account key access: Disabled** (export managed identity kullanır; açmanıza gerek yoktur, script tekrar çalışınca yine kapatılır) |
+| 3 | Storage → *Networking* | Public network access: *Enabled from all networks* (veya seçili ağlar + *Allow trusted Microsoft services*) |
+| 4 | Storage → Containers → `costs` | Adım 2'den önce boş, sonra `focus/<abonelik-id>/...` klasörleri |
+| 5 | Cost Management → Scope: abonelik → **Exports** → `focus-daily-<env>` | Type FOCUS, Daily, Parquet, klasör `focus/<abonelik-id>`, *Next run* yarın |
+| 6 | `costs` container → *Access control (IAM)* → *Role assignments* | Export'un kimliği: **Storage Blob Data Contributor** |
+
+Birden fazla abonelikte 5. ve 6. satırı her abonelik için kontrol edin (her export'un ayrı kimliği ve rol ataması olur).
+
 ## 2.7 Manuel (portal) alternatif
 
 1. Portal → **Cost Management** → Scope olarak aboneliği seçin → **Exports** → **+ Create**.
 2. Template: **Cost and usage (FOCUS)**, Frequency: **Daily export of month-to-date costs**.
 3. Destination: storage account, container `costs`, directory `focus/<abonelik-id>`.
-4. Format: **Parquet**, compression **Snappy**, **Overwrite data** işaretli.
+4. **Use system-assigned managed identity** işaretli (storage'da key access kapalıysa zorunlu).
+5. Format: **Parquet**, compression **Snappy**, **Overwrite data** işaretli.
+
+Çok sayıda abonelikte bu adımları elle tekrarlamak yerine [2.8](#28-birden-fazla-abonelik)'deki otomasyonu kullanın.
 
 ## 2.8 Birden fazla abonelik
 
@@ -144,3 +160,29 @@ Dikkat edilmesi gerekenler:
 - **Yetki:** Bicep deployment'ı tek bir işlemdir; bir abonelikte yetkiniz yoksa tüm deployment başarısız olur. Önce `-ExportSubscriptionIds` ile yetkili olduğunuz abonelikleri verin.
 - **Çift sayım:** (a)/(b) ile (c)'yi birlikte kullanmayın; aynı maliyet hem abonelik hem fatura hesabı export'unda bulunur ve iki kez sayılır.
 - **Fabric tarafı değişmez:** Bronze `Files/costs/` altındaki tüm export'ları okur; Gold `gold_dim_subscription` boyutunu üretir ve rapor abonelik bazında filtrelenebilir.
+
+### Otomasyon nasıl çalışır?
+
+1. Script export alınacak abonelik listesini belirler (parametre, tenant'taki tüm abonelikler veya fatura kapsamı).
+2. Her abonelikte `Microsoft.CostManagementExports` provider'ını kaydeder.
+3. `infra/main.bicep` listeyi döngüyle işler: `module costExports ... = [for subscriptionId in exportSubscriptions: { scope: subscription(subscriptionId) ... }]`. Her aboneliğe **aynı ayarlarla** (FOCUS, günlük, Parquet, managed identity) bir export oluşturur.
+4. Tüm export ID'leri `.azure-outputs.json` → `COST_EXPORT_IDS` içine yazılır; `02-run-cost-export.ps1` hepsini çalıştırır ve geçmişi doldurur.
+
+Script **idempotenttir**: tekrar çalıştırmak var olanları günceller, listeye eklenen yeni aboneliğe export kurar.
+
+### Klasör adlandırma
+
+| Kapsam | Klasör |
+|---|---|
+| Abonelik export'u | `costs/focus/<abonelik-id>/<export-adı>/<yyyyMMdd-yyyyMMdd>/<runId>/` |
+| Fatura hesabı export'u | `costs/focus/billing/<export-adı>/<yyyyMMdd-yyyyMMdd>/<runId>/` |
+
+- **Neden ad değil ID?** Abonelik adı değişebilir ve boşluk/Türkçe karakter içerebilir; ID sabit ve benzersizdir. Raporda görünen ad, verideki `SubAccountName` kolonundan gelir (`Subscription` tablosu).
+- **Neden ayrı klasör?** Tüm export'lar aynı adı taşır; ayrı klasör olmasa birbirinin üzerine yazarlardı.
+
+### Yeni açılan abonelikleri otomatik ekleme
+
+| Yöntem | Nasıl |
+|---|---|
+| Zamanlanmış çalıştırma (önerilen, basit) | `01-deploy-azure.ps1 -EnvironmentName <env> -AllSubscriptions` komutunu haftalık bir GitHub Actions / Azure DevOps pipeline'ında veya Azure Automation runbook'unda çalıştırın. Kimlik: tüm aboneliklerde *Cost Management Contributor* + storage'da *User Access Administrator* olan bir service principal / managed identity |
+| Azure Policy (deployIfNotExists) | Management group'a, abonelikte `Microsoft.CostManagement/exports` yoksa `cost-export.bicep` ile aynı export'u oluşturan özel bir politika atayın. Daha karmaşıktır; remediation görevi ve politika kimliğine yetki gerekir |

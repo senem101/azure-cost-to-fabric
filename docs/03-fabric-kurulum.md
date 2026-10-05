@@ -15,7 +15,7 @@
 
 ```powershell
 python -m pip install -r scripts/requirements.txt
-python scripts/setup_fabric.py --capacity-name senem2fabric --schedule-time 06:00
+python scripts/setup_fabric.py --capacity-name <kapasite-adi> --schedule-time 06:00
 ```
 
 ## 3.2 Script ne yapıyor?

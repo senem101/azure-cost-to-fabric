@@ -41,7 +41,7 @@ AZURE_STORAGE_ACCOUNT_NAME   stcostdemo3x7k2...
 AZURE_STORAGE_DFS_URL        https://stcostdemo3x7k2....dfs.core.windows.net/
 COST_EXPORT_NAME             focus-daily-demo
 COST_EXPORT_IDS              ["/subscriptions/<A>/providers/Microsoft.CostManagement/exports/focus-daily-demo", ...]
-AZURE_SUBSCRIPTION_ID        9dc2...
+AZURE_SUBSCRIPTION_ID        <storage-abonelik-id>
 ```
 
 ## 2.3 Export ayarları (`infra/modules/cost-export.bicep`)

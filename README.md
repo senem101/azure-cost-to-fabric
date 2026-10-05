@@ -88,6 +88,8 @@ Fabric tarafında değişiklik gerekmez: Bronze tüm klasörleri okur, Silver he
 | 6 | [Demo adım adım](docs/demo-adim-adim.md) | Yerel ve canlı demo senaryosu |
 | 7 | [Sorun giderme](docs/06-sorun-giderme.md) | Sık karşılaşılan hatalar ve çözümleri |
 
+📄 **Müşteriyle paylaşılabilir kurulum rehberi (Word):** [docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx](docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx) — mimari, güvenlik, ön koşullar ve bilgi formu, adım adım kurulum, doğrulama ve kabul formu, işletim, maliyet tahmini, sorun giderme.
+
 ## Repo yapısı
 
 ```

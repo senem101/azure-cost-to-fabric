@@ -19,9 +19,10 @@ function Step($n, $title, $text) {
 }
 
 Step 0 'Hazirlik' 'Python sanal ortami (.venv) kuruluyor: pandas + pyarrow.'
-if (-not (Test-Path .venv)) { python -m venv .venv }
-.\.venv\Scripts\python -m pip install -q --disable-pip-version-check -r requirements.txt
-$py = Resolve-Path .\.venv\Scripts\python.exe
+$sysPy = if (Get-Command python3 -ErrorAction SilentlyContinue) { 'python3' } else { 'python' }
+if (-not (Test-Path .venv)) { & $sysPy -m venv .venv }
+$py = if ($IsWindows -or $env:OS -eq 'Windows_NT') { Resolve-Path .venv/Scripts/python.exe } else { Resolve-Path .venv/bin/python }
+& $py -m pip install -q --disable-pip-version-check -r requirements.txt
 
 Step 1 'Azure Cost Management export (simulasyon)' @'
 Gercekte Azure her gun FOCUS 1.0 formatinda Parquet dosyalarini storage'a yazar.
@@ -43,6 +44,8 @@ Gold   : Power BI icin yildiz sema (fact + tarih/abonelik/kaynak/servis boyutlar
 
 Step 3 'Rapor onizlemesi' 'Gold tablolarindan Power BI raporunun HTML onizlemesi uretiliyor ve aciliyor.'
 & $py build_report.py
-Start-Process (Resolve-Path output\cost_report.html)
+$html = Resolve-Path output/cost_report.html
+if ($IsWindows -or $IsMacOS -or $env:OS -eq 'Windows_NT') { Start-Process $html }
+else { Write-Host "Rapor: $html (Cloud Shell'de 'Manage files > Download' ile indirip tarayicida acin)" -ForegroundColor Yellow }
 
 Write-Host "`nDemo tamamlandi. Ciktilar: $(Resolve-Path output)" -ForegroundColor Green

@@ -48,6 +48,8 @@ Script her adımda durup ne yaptığını açıklar: 3 abonelik için örnek FOC
 
 ### B) Gerçek kurulum — Azure + Fabric
 
+> **Editör gerekmez.** Komutlar bir terminalde çalıştırılır: hiçbir şey kurmadan tarayıcıda **Azure Cloud Shell (PowerShell)** veya Windows'ta **PowerShell 7**. Paketi edinme, ortam hazırlığı ve çalıştırma sırası: [docs/07-adim-adim-calistirma.md](docs/07-adim-adim-calistirma.md).
+
 Ön koşullar: Azure CLI (`az login`), Python 3.10+, PowerShell 7, **aktif** bir Fabric kapasitesi (F2+ veya Trial) ve abonelikte *Cost Management Contributor* + *Owner/User Access Administrator* (rol ataması için) yetkileri.
 
 ```powershell
@@ -87,6 +89,7 @@ Fabric tarafında değişiklik gerekmez: Bronze tüm klasörleri okur, Silver he
 | 5 | [Power BI rapor](docs/05-power-bi-rapor.md) | Semantic model, DAX ölçüleri, hazır filtreli rapor sayfası, ek sayfalar |
 | 6 | [Demo adım adım](docs/demo-adim-adim.md) | Yerel ve canlı demo senaryosu |
 | 7 | [Sorun giderme](docs/06-sorun-giderme.md) | Sık karşılaşılan hatalar ve çözümleri |
+| 8 | [Adım adım çalıştırma](docs/07-adim-adim-calistirma.md) | Editör olmadan: Cloud Shell veya PowerShell ile hazırlık ve script'lerin çalıştırma sırası |
 
 📄 **Müşteriyle paylaşılabilir kurulum rehberi (Word):** [docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx](docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx) — mimari, güvenlik, ön koşullar ve bilgi formu, adım adım kurulum, doğrulama ve kabul formu, işletim, maliyet tahmini, sorun giderme.
 

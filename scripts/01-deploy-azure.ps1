@@ -12,9 +12,12 @@
 
   Storage always lives in the current (or -SubscriptionId) subscription. Each export writes to
   costs/focus/<subscriptionId>/ (or costs/focus/billing/ for -BillingScope).
+  -ResourceGroupName / -StorageAccountName override the default names
+  (rg-costfabric-<env> / stcost<unique-token>).
 
 .EXAMPLE
   ./scripts/01-deploy-azure.ps1 -EnvironmentName demo
+  ./scripts/01-deploy-azure.ps1 -EnvironmentName prod -ResourceGroupName rg-costmgmt -StorageAccountName strcostmgmt
   ./scripts/01-deploy-azure.ps1 -EnvironmentName demo -ExportSubscriptionIds <sub1>,<sub2>,<sub3>
   ./scripts/01-deploy-azure.ps1 -EnvironmentName demo -AllSubscriptions
   ./scripts/01-deploy-azure.ps1 -EnvironmentName demo -BillingScope /providers/Microsoft.Billing/billingAccounts/<id>
@@ -24,11 +27,14 @@ param(
     [Parameter(Mandatory)] [ValidateLength(2, 10)] [string] $EnvironmentName,
     [string] $Location = 'westeurope',
     [string] $SubscriptionId,
+    [ValidateLength(1, 90)] [string] $ResourceGroupName,
+    [ValidatePattern('^[a-z0-9]{3,24}$')] [string] $StorageAccountName,
     [Parameter(ParameterSetName = 'Subscriptions')] [string[]] $ExportSubscriptionIds,
     [Parameter(ParameterSetName = 'All')] [switch] $AllSubscriptions,
     [Parameter(ParameterSetName = 'Billing')] [string] $BillingScope
 )
 $ErrorActionPreference = 'Stop'
+if ($StorageAccountName) { $StorageAccountName = $StorageAccountName.ToLowerInvariant() }
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $api = '2025-03-01'
 
@@ -77,19 +83,34 @@ foreach ($sub in $exportSubs | Where-Object { $_ -ne $account.id }) {
     Register-Providers $sub @('Microsoft.CostManagementExports')
 }
 
+if ($StorageAccountName) {
+    $check = az storage account check-name --name $StorageAccountName -o json | ConvertFrom-Json
+    if (-not $check.nameAvailable) {
+        $existing = az storage account list --subscription $account.id --query "[?name=='$StorageAccountName'].resourceGroup | [0]" -o tsv 2>$null
+        $targetRg = if ($ResourceGroupName) { $ResourceGroupName } else { "rg-costfabric-$EnvironmentName" }
+        if ($existing -ne $targetRg) {
+            throw "Storage account name '$StorageAccountName' is not available ($($check.reason)): $($check.message)"
+        }
+        Write-Host "Storage account '$StorageAccountName' already exists in $targetRg; it will be updated."
+    }
+}
+
 Step '3/5 Deploy infra/main.bicep (subscription scope)'
 $userObjectId = az ad signed-in-user show --query id -o tsv 2>$null
 $paramsFile = New-TemporaryFile
+$bicepParams = [ordered]@{
+    environmentName           = @{ value = $EnvironmentName }
+    location                  = @{ value = $Location }
+    readerUserObjectId        = @{ value = "$userObjectId" }
+    exportSubscriptionIds     = @{ value = @($exportSubs) }
+    createSubscriptionExports = @{ value = ($PSCmdlet.ParameterSetName -ne 'Billing') }
+}
+if ($ResourceGroupName) { $bicepParams.resourceGroupName = @{ value = $ResourceGroupName } }
+if ($StorageAccountName) { $bicepParams.storageAccountName = @{ value = $StorageAccountName } }
 @{
     '$schema'      = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
     contentVersion = '1.0.0.0'
-    parameters     = @{
-        environmentName           = @{ value = $EnvironmentName }
-        location                  = @{ value = $Location }
-        readerUserObjectId        = @{ value = "$userObjectId" }
-        exportSubscriptionIds     = @{ value = @($exportSubs) }
-        createSubscriptionExports = @{ value = ($PSCmdlet.ParameterSetName -ne 'Billing') }
-    }
+    parameters     = $bicepParams
 } | ConvertTo-Json -Depth 5 | Set-Content $paramsFile -Encoding utf8
 try {
     $outputs = az deployment sub create `

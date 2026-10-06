@@ -14,6 +14,10 @@ param location string = deployment().location
 @description('Resource group that will hold the landing-zone storage account.')
 param resourceGroupName string = 'rg-costfabric-${environmentName}'
 
+@description('Storage account name (3-24 lowercase letters/digits, globally unique). Empty = generated stcost<token>.')
+@maxLength(24)
+param storageAccountName string = ''
+
 @description('Object ID of a user that should be able to browse the exported files and create the Fabric connection (Storage Blob Data Reader). Leave empty to skip.')
 param readerUserObjectId string = ''
 
@@ -30,7 +34,7 @@ param exportSubscriptionIds array = []
 param createSubscriptionExports bool = true
 
 var resourceToken = toLower(uniqueString(subscription().id, environmentName))
-var storageAccountName = take('stcost${resourceToken}', 24)
+var storageName = empty(storageAccountName) ? take('stcost${resourceToken}', 24) : toLower(storageAccountName)
 var exportName = 'focus-daily-${environmentName}'
 var exportSubscriptions = createSubscriptionExports
   ? (empty(exportSubscriptionIds) ? [subscription().subscriptionId] : exportSubscriptionIds)
@@ -50,7 +54,7 @@ module storage 'modules/storage.bicep' = {
   scope: rg
   name: 'costLandingStorage'
   params: {
-    storageAccountName: storageAccountName
+    storageAccountName: storageName
     location: location
     tags: tags
     readerUserObjectId: readerUserObjectId

@@ -3,7 +3,13 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "environmentName": {
-      "value": "demo"
+      "value": "prod"
+    },
+    "resourceGroupName": {
+      "value": "rg-costmgmt"
+    },
+    "storageAccountName": {
+      "value": "strcostmgmt"
     }
   }
 }

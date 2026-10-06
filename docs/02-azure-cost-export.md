@@ -19,7 +19,12 @@ Bu adımda Azure tarafında üç şey kurulur:
 
 ```powershell
 ./scripts/01-deploy-azure.ps1 -EnvironmentName demo -Location westeurope
+
+# Kendi resource group / storage adlarınızla (storage adı: 3-24 küçük harf/rakam, Azure genelinde benzersiz)
+./scripts/01-deploy-azure.ps1 -EnvironmentName prod -ResourceGroupName rg-costmgmt -StorageAccountName strcostmgmt
 ```
+
+Adlar verilmezse `rg-costfabric-<env>` ve `stcost<benzersiz-kod>` kullanılır. Script, verilen storage adının kullanılabilir olduğunu deploy'dan önce kontrol eder.
 
 Script sırasıyla:
 

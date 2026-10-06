@@ -149,6 +149,12 @@ Kapsamınıza uyan **tek** komutu çalıştırın:
 ./scripts/01-deploy-azure.ps1 -EnvironmentName prod -BillingScope /providers/Microsoft.Billing/billingAccounts/<id>  # EA/MCA
 ```
 
+Varsayılan adlar `rg-costfabric-<env>` ve `stcost<benzersiz-kod>`'dur. Kendi adlarınızı kullanmak için yukarıdaki komutlardan herhangi birine `-ResourceGroupName` ve `-StorageAccountName` ekleyin (storage adı 3–24 küçük harf/rakam ve Azure genelinde benzersiz olmalıdır):
+
+```powershell
+./scripts/01-deploy-azure.ps1 -EnvironmentName prod -ResourceGroupName rg-costmgmt -StorageAccountName strcostmgmt -ExportSubscriptionIds <id1>,<id2>
+```
+
 ✅ Sonunda `.azure-outputs.json` oluşur. Portal → Cost Management → **Exports** altında `focus-daily-prod` görünür.
 
 ### Adım 3 – İlk veri yükleme

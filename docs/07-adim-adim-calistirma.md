@@ -56,6 +56,35 @@ winget install --id Microsoft.AzureCLI -e
 winget install --id Python.Python.3.12 -e
 ```
 
+**winget hata verirse:**
+
+| Belirti | Çözüm |
+|---|---|
+| `winget` *is not recognized* | Microsoft Store → **Uygulama Yükleyici (App Installer)** güncelleyin veya aşağıdaki doğrudan kuruluma geçin |
+| *No package found* / kaynak (source) hatası / anlaşma sorusu | `winget source reset --force` (yönetici), ardından komutlara `--source winget --accept-source-agreements --accept-package-agreements` ekleyin |
+| Kurumsal politika engeli, yönetici izni yok, proxy | Aşağıdaki **doğrudan kurulum** (yönetici gerekmez) veya hiç kurulum gerektirmeyen **Seçenek 1: Cloud Shell** |
+
+**Doğrudan kurulum (winget olmadan, yönetici gerekmez).** Windows PowerShell'de çalıştırın:
+
+```powershell
+$ProgressPreference = 'SilentlyContinue'
+
+# PowerShell 7 → %LOCALAPPDATA%\Microsoft\powershell
+iex "& { $(irm https://aka.ms/install-powershell.ps1) } -AddToPath"
+
+# Azure CLI (ZIP paketi) → %LOCALAPPDATA%\AzureCLI
+Invoke-WebRequest https://aka.ms/installazurecliwindowszipx64 -OutFile $env:TEMP\azcli.zip
+Expand-Archive $env:TEMP\azcli.zip -DestinationPath $env:LOCALAPPDATA\AzureCLI -Force
+$p = [Environment]::GetEnvironmentVariable('Path', 'User')
+[Environment]::SetEnvironmentVariable('Path', "$p;$env:LOCALAPPDATA\AzureCLI\bin", 'User')
+
+# Python 3.12 (yalnızca kullanıcı için, PATH'e eklenir)
+Invoke-WebRequest https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe -OutFile $env:TEMP\python-setup.exe
+Start-Process $env:TEMP\python-setup.exe -Wait -ArgumentList '/quiet InstallAllUsers=0 PrependPath=1 Include_launcher=0'
+```
+
+> Bu yolla kurulan PowerShell 7 Başlat menüsünde görünmeyebilir; yeni bir terminal açıp `pwsh` yazarak başlatın. Komut satırından indirme engelleniyorsa kurulum dosyaları ([Azure CLI](https://aka.ms/installazurecliwindowsx64), [PowerShell 7](https://github.com/PowerShell/PowerShell/releases/latest) → `PowerShell-7.x-win-x64.msi`, [Python](https://www.python.org/downloads/windows/)) tarayıcıdan indirilip çift tıklanarak veya BT ekibinin yazılım merkezi (Company Portal / Software Center) üzerinden kurulabilir.
+
 Kurulumdan sonra **tüm terminal pencerelerini kapatın** ve Başlat menüsünden **PowerShell 7** (`pwsh`) açın. Kontrol:
 
 ```powershell
@@ -193,6 +222,7 @@ Workspace → **Manage access** → okuyucu grubu → **Viewer**. F64'ten küç�
 |---|---|
 | `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
 | `az` / `python` *is not recognized* | Kurulumdan sonra terminali kapatıp yeniden açın |
+| `winget` hata veriyor veya yok | 1B'deki **doğrudan kurulum** komutlarını kullanın ya da Cloud Shell'e geçin |
 | `python` Microsoft Store'u açıyor | Ayarlar → Uygulamalar → *Gelişmiş uygulama ayarları* → **Uygulama yürütme diğer adları** → `python.exe` ve `python3.exe` kapatın |
 | `No module named azure` / `click` | Sanal ortam etkin değil: `Activate.ps1` satırını tekrar çalıştırın |
 | `AADSTS…` / *InteractionRequired* | `az login --tenant <TENANT_ID>` |

@@ -10,6 +10,8 @@ Kurulum için **VS Code veya başka bir editör gerekmez**. Tüm script'ler bir 
 
 Her iki seçenekte de komutlar aynıdır; yalnızca **hazırlık** (0. ve 1. adım) farklıdır.
 
+> 📄 Bu sayfanın müşteriyle paylaşılabilir Word sürümü: [Azure-Maliyet-Fabric-Calistirma-Rehberi.docx](Azure-Maliyet-Fabric-Calistirma-Rehberi.docx)
+
 ---
 
 ## 0. Çözüm paketini edinme

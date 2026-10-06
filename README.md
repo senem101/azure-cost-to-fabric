@@ -93,6 +93,8 @@ Fabric tarafında değişiklik gerekmez: Bronze tüm klasörleri okur, Silver he
 
 📄 **Müşteriyle paylaşılabilir kurulum rehberi (Word):** [docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx](docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx) — mimari, güvenlik, ön koşullar ve bilgi formu, adım adım kurulum, doğrulama ve kabul formu, işletim, maliyet tahmini, sorun giderme.
 
+📄 **Adım adım çalıştırma rehberi (Word, editör gerektirmez):** [docs/Azure-Maliyet-Fabric-Calistirma-Rehberi.docx](docs/Azure-Maliyet-Fabric-Calistirma-Rehberi.docx) — Cloud Shell veya Windows PowerShell 7 ile hazırlık, script'lerin çalıştırma sırası, kurulum sonrası işlemler, terminal hataları ve tek sayfalık komut özeti.
+
 ## Repo yapısı
 
 ```

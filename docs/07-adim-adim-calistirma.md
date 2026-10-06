@@ -223,7 +223,7 @@ Workspace → **Manage access** → okuyucu grubu → **Viewer**. F64'ten küç�
 | `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
 | `az` / `python` *is not recognized* | Kurulumdan sonra terminali kapatıp yeniden açın |
 | `winget` hata veriyor veya yok | 1B'deki **doğrudan kurulum** komutlarını kullanın ya da Cloud Shell'e geçin |
-| `python` Microsoft Store'u açıyor | Ayarlar → Uygulamalar → *Gelişmiş uygulama ayarları* → **Uygulama yürütme diğer adları** → `python.exe` ve `python3.exe` kapatın |
+| `python` Microsoft Store'u açıyor / *Python was not found* | Ayarlar → Uygulamalar → *Gelişmiş uygulama ayarları* → **Uygulama yürütme diğer adları** → `python.exe` ve `python3.exe` kapatın; terminali tamamen kapatıp yeniden açın. `where.exe python` ilk satırda hâlâ `WindowsApps` gösteriyorsa kullanıcı `Path` değişkeninde Python satırlarını `...\Microsoft\WindowsApps` satırının **üstüne** taşıyın. Hemen devam etmek için tam yolu kullanın: `& "$env:LOCALAPPDATA\Programs\Python\Python3xx\python.exe" -m venv scripts\.venv` (Python'u bulmak için: `Get-ChildItem "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe"`) |
 | `No module named azure` / `click` | Sanal ortam etkin değil: `Activate.ps1` satırını tekrar çalıştırın |
 | `AADSTS…` / *InteractionRequired* | `az login --tenant <TENANT_ID>` |
 | Cloud Shell bağlantısı koptu | Yeniden bağlanın, *Yeni bir pencere açtığınızda* bölümündeki komutları çalıştırıp kaldığınız adımı tekrarlayın |

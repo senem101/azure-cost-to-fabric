@@ -6,3 +6,6 @@ local-demo/output/
 .azure-outputs.json
 .fabric-outputs.json
 .env
+
+# Office lock files
+~$*

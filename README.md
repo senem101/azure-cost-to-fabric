@@ -90,6 +90,7 @@ Fabric tarafında değişiklik gerekmez: Bronze tüm klasörleri okur, Silver he
 | 6 | [Demo adım adım](docs/demo-adim-adim.md) | Yerel ve canlı demo senaryosu |
 | 7 | [Sorun giderme](docs/06-sorun-giderme.md) | Sık karşılaşılan hatalar ve çözümleri |
 | 8 | [Adım adım çalıştırma](docs/07-adim-adim-calistirma.md) | Editör olmadan: Cloud Shell veya PowerShell ile hazırlık ve script'lerin çalıştırma sırası |
+| 9 | [Durdurma ve yeniden başlatma](docs/08-durdurma-ve-devam-etme.md) | FOCUS export'larını script ile pasifleştirme, Fabric zamanlamasını kapatma, yeniden başlatma |
 
 📄 **Müşteriyle paylaşılabilir kurulum rehberi (Word):** [docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx](docs/Azure-Maliyet-Fabric-Kurulum-Rehberi.docx) — mimari, güvenlik, ön koşullar ve bilgi formu, adım adım kurulum, doğrulama ve kabul formu, işletim, maliyet tahmini, sorun giderme.
 
@@ -107,6 +108,7 @@ azure-cost-to-fabric/
 ├── scripts/
 │   ├── 01-deploy-azure.ps1        # Bicep deploy (+ çoklu abonelik / billing scope) → .azure-outputs.json
 │   ├── 02-run-cost-export.ps1     # Tüm export'ları şimdi çalıştır + geçmiş ayları doldur
+│   ├── 03-set-cost-export-schedule.ps1 # FOCUS zamanlamalarını kapat / aç (WhatIf, tüm abonelikler)
 │   └── setup_fabric.py            # Fabric REST API ile uçtan uca kurulum
 ├── fabric/
 │   ├── notebooks/                 # 01_bronze, 02_silver, 03_gold (PySpark)

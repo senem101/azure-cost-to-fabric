@@ -219,6 +219,7 @@ Workspace → **Manage access** → okuyucu grubu → **Viewer**. F64'ten küç�
 | Yeni abonelik ekleme | `./scripts/01-deploy-azure.ps1 -EnvironmentName prod -ExportSubscriptionIds <id1>,<id2>,<yeniId>` → `./scripts/02-run-cost-export.ps1 -BackfillMonths 3` |
 | Notebook / model / rapor güncelleme | `python scripts/setup_fabric.py --capacity-name <K> --connection-id <GUID> --skip-run` |
 | Yalnızca raporu yeniden yayımlama | yukarıdakine `--skip-semantic-model` ekleyin |
+| FOCUS export zamanlamalarını durdurma | Önce `.\scripts\03-set-cost-export-schedule.ps1 -WhatIf`, sonra `.\scripts\03-set-cost-export-schedule.ps1`. Tüm erişilebilir abonelikler için `-AllSubscriptions` ekleyin; [kapsam ve Fabric adımları](08-durdurma-ve-devam-etme.md) |
 | Kapasiteyi durdurma | `az resource invoke-action --action suspend --ids <kapasite-resource-id>` |
 | Kaldırma | [demo-adim-adim.md](demo-adim-adim.md) → Temizlik |
 
